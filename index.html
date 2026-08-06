@@ -1,0 +1,1379 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#000000" />
+    <title>传讯·字卡</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="css/styles.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+</head>
+<body>
+
+    <!-- ===== 导航栏 ===== -->
+    <header class="wechat-nav" id="navBar">
+        <div class="nav-center">
+            <span class="contact-name" id="contactName">梦角</span>
+            <span class="contact-status" id="contactStatus">在线</span>
+        </div>
+        <div class="nav-right">
+            <button class="nav-btn" id="themeToggle" title="切换主题"><i class="fas fa-moon"></i></button>
+        </div>
+    </header>
+
+    <!-- ===== 聊天包裹容器 ===== -->
+    <div class="chat-wrapper">
+        <!-- 聊天区域 -->
+        <div class="chat-area" id="chatArea"></div>
+
+        <!-- 底部输入栏 -->
+        <div class="wechat-input-bar" id="inputBar">
+            <button class="btn-icon call-btn" id="callBtn" title="通话"><i class="fas fa-phone"></i></button>
+
+            <div class="input-wrap">
+                <textarea id="msgInput" rows="1" placeholder="输入消息…" maxlength="500"></textarea>
+                <button class="btn-send" id="sendBtn" title="发送"><i class="fas fa-arrow-up"></i></button>
+            </div>
+            <button class="btn-icon" id="emojiBtn" title="表情包"><i class="far fa-smile"></i></button>
+            <button class="btn-icon settings-btn" id="settingsBtn" title="更多功能"><i class="fas fa-plus"></i></button>
+        </div>
+    </div>
+
+    <!-- ===== 字卡面板 ===== -->
+    <div class="panel-overlay" id="cardPanel">
+        <div class="panel-sheet">
+            <div class="panel-header">
+                <h2><i class="fas fa-book-open" style="margin-right:8px;color:var(--wechat-green);"></i>字卡 & Emoji</h2>
+                <button class="close-panel" id="closeCardPanel"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="card-tabs">
+                <button class="card-tab-btn active" data-tab="cards">字卡</button>
+                <button class="card-tab-btn" data-tab="emojis">Emoji</button>
+            </div>
+            <div class="panel-body" id="cardListContainer"></div>
+            <div class="card-bottom-actions">
+                <div class="card-add-row">
+                    <input type="text" id="newCardInput" placeholder="输入新内容…" maxlength="200" />
+                    <button class="add-btn" id="addCardBtn">添加</button>
+                </div>
+                <div id="groupSelectorWrapper" style="display:flex;gap:8px;margin-top:4px;align-items:center;font-size:13px;flex-wrap:wrap;">
+                    <span style="color:var(--wechat-text-secondary);">分配到：</span>
+                    <select id="addCardGroupSelect" style="flex:1;min-width:100px;padding:6px 10px;border:1px solid var(--wechat-border);border-radius:8px;background:var(--wechat-input-bg);color:var(--wechat-text-primary);outline:none;font-size:13px;">
+                        <option value="">无分组</option>
+                    </select>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+                    <button id="batchAddBtn" style="flex:1;padding:6px 12px;background:var(--wechat-green);color:#fff;border:none;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;">批量添加</button>
+                    <button id="importJsonBtn" style="flex:1;padding:6px 12px;background:var(--wechat-input-bg);color:var(--wechat-text-primary);border:1px solid var(--wechat-border);border-radius:8px;font-size:12px;cursor:pointer;">导入 JSON</button>
+                    <button id="resetDefaultCards" style="flex:0 0 auto;padding:6px 12px;background:none;border:none;color:var(--wechat-text-secondary);cursor:pointer;font-size:11px;text-decoration:underline;opacity:0.5;">恢复默认字卡</button>
+                </div>
+                <div class="card-bottom-meta">
+                    <span id="cardCount">共 0 条</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 表情包面板 ===== -->
+    <div class="panel-overlay" id="emojiPanel">
+        <div class="panel-sheet">
+            <div class="panel-header">
+                <h2><i class="far fa-smile" style="margin-right:8px;color:var(--wechat-green);"></i>表情包</h2>
+                <button class="close-panel" id="closeEmojiPanel"><i class="fas fa-times"></i></button>
+            </div>
+            <div style="display:flex;gap:8px;padding:8px 16px 0;border-bottom:0.5px solid var(--wechat-border);flex-shrink:0;background:var(--wechat-nav-bg);">
+                <button class="emoji-tab-btn active" data-tab="my">我方</button>
+                <button class="emoji-tab-btn" data-tab="partner">对方</button>
+            </div>
+            <div class="panel-body" id="emojiContent"></div>
+        </div>
+    </div>
+
+    <!-- ===== 头像/背景面板 ===== -->
+    <div class="panel-overlay" id="avatarPanel">
+        <div class="panel-sheet">
+            <div class="panel-header">
+                <h2><i class="fas fa-user-circle" style="margin-right:8px;color:var(--wechat-green);"></i>头像 & 背景</h2>
+                <button class="close-panel" id="closeAvatarPanel"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="panel-body" id="avatarContent"></div>
+        </div>
+    </div>
+
+    <!-- ===== 会话管理面板 ===== -->
+    <div class="panel-overlay" id="sessionPanel">
+        <div class="panel-sheet">
+            <div class="panel-header">
+                <h2><i class="fas fa-folder-open" style="margin-right:8px;color:var(--wechat-green);"></i>会话管理</h2>
+                <button class="close-panel" id="closeSessionPanel"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="panel-body" id="sessionListContainer"></div>
+            <div class="card-bottom-actions">
+                <button class="add-btn" id="createSessionBtn" style="width:100%;padding:12px;background:var(--wechat-green);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;">➕ 新建会话</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 备份面板 ===== -->
+    <div class="panel-overlay" id="backupPanel">
+        <div class="panel-sheet backup-panel">
+            <div class="panel-header">
+                <h2><i class="fas fa-database" style="margin-right:8px;color:var(--wechat-green);"></i>存储与备份</h2>
+                <button class="close-panel" id="closeBackupPanel"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="panel-body" id="backupContent">
+                <div class="backup-section">
+                    <div class="backup-section-title">全部备份</div>
+                    <div class="backup-btn-group">
+                        <button class="backup-btn primary" id="exportFullBtn">导出全部数据</button>
+                        <button class="backup-btn primary" id="importFullBtn">导入全部数据</button>
+                    </div>
+                    <div style="font-size:12px;color:var(--wechat-text-secondary);margin-top:4px;">包含聊天记录、字卡、表情、emoji、头像&背景&昵称</div>
+                </div>
+                <div class="backup-section">
+                    <div class="backup-section-title">单独备份</div>
+                    <div class="backup-btn-group">
+                        <button class="backup-btn" data-module="messages">聊天记录</button>
+                        <button class="backup-btn" data-module="cards">字卡（含分组）</button>
+                        <button class="backup-btn" data-module="emojis">表情包</button>
+                        <button class="backup-btn" data-module="textEmojis">Emoji</button>
+                        <button class="backup-btn" data-module="avatar">头像&背景&昵称</button>
+                    </div>
+                </div>
+                <div class="backup-section">
+                    <div class="backup-section-title">存储</div>
+                    <div id="storageInfo" style="font-size:13px;color:var(--wechat-text-secondary);">
+                        已用：<span id="usedStorage">计算中…</span> ｜ 总配额：<span id="totalStorage">计算中…</span>
+                    </div>
+                    <button id="refreshStorageBtn" style="margin-top:6px;padding:4px 12px;background:var(--wechat-border);border:none;border-radius:6px;font-size:12px;cursor:pointer;">刷新</button>
+                </div>
+                <div class="backup-section" style="border-color:#fa5151;">
+                    <div class="backup-section-title" style="color:#fa5151;">⚠️ 危险操作</div>
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                        <div style="flex:1;min-width:120px;text-align:center;">
+                            <button id="clearSessionBtn" style="padding:6px 16px;background:#fa5151;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;width:100%;">清除会话</button>
+                            <div style="font-size:11px;color:var(--wechat-text-secondary);opacity:0.6;margin-top:2px;">删除此会话消息</div>
+                        </div>
+                        <div style="flex:1;min-width:120px;text-align:center;">
+                            <button id="resetAllBtn" style="padding:6px 16px;background:#fa5151;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;width:100%;">重置数据</button>
+                            <div style="font-size:11px;color:var(--wechat-text-secondary);opacity:0.6;margin-top:2px;">删除所有，无法恢复，请确保有备份</div>
+                        </div>
+                    </div>
+                </div>
+                <div style="font-size:11px;color:var(--wechat-text-secondary);opacity:0.7;text-align:center;margin-top:8px;">
+                    备份文件为 JSON 格式，可在不同设备间迁移
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 设置面板（加号菜单） ===== -->
+    <div class="panel-overlay" id="settingsPanel">
+        <div class="panel-sheet">
+            <div class="panel-header">
+                <h2><i class="fas fa-cog" style="margin-right:8px;color:var(--wechat-green);"></i>更多功能</h2>
+                <button class="close-panel" id="closeSettingsPanel"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="panel-body" id="settingsContent">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <button class="settings-entry" data-action="session" style="padding:16px;background:var(--wechat-bubble-recv);border:1px solid var(--wechat-border);border-radius:12px;cursor:pointer;text-align:center;color:var(--wechat-text-primary);">
+                        <i class="fas fa-folder-open" style="font-size:24px;display:block;margin-bottom:6px;color:var(--wechat-green);"></i>
+                        <span style="font-size:13px;font-weight:500;">会话管理</span>
+                    </button>
+                    <button class="settings-entry" data-action="backup" style="padding:16px;background:var(--wechat-bubble-recv);border:1px solid var(--wechat-border);border-radius:12px;cursor:pointer;text-align:center;color:var(--wechat-text-primary);">
+                        <i class="fas fa-database" style="font-size:24px;display:block;margin-bottom:6px;color:var(--wechat-green);"></i>
+                        <span style="font-size:13px;font-weight:500;">存储与备份</span>
+                    </button>
+                    <button class="settings-entry" data-action="cards" style="padding:16px;background:var(--wechat-bubble-recv);border:1px solid var(--wechat-border);border-radius:12px;cursor:pointer;text-align:center;color:var(--wechat-text-primary);">
+                        <i class="fas fa-book-open" style="font-size:24px;display:block;margin-bottom:6px;color:var(--wechat-green);"></i>
+                        <span style="font-size:13px;font-weight:500;">字卡管理</span>
+                    </button>
+                    <button class="settings-entry" data-action="message" style="padding:16px;background:var(--wechat-bubble-recv);border:1px solid var(--wechat-border);border-radius:12px;cursor:pointer;text-align:center;color:var(--wechat-text-primary);">
+                        <i class="fas fa-comment" style="font-size:24px;display:block;margin-bottom:6px;color:var(--wechat-green);"></i>
+                        <span style="font-size:13px;font-weight:500;">消息</span>
+                    </button>
+                </div>
+                <div style="margin-top:16px;text-align:center;font-size:12px;color:var(--wechat-text-secondary);opacity:0.6;">
+                    点击功能图标打开对应面板
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 消息设置面板 ===== -->
+    <div class="panel-overlay" id="messageSettingsPanel">
+        <div class="panel-sheet">
+            <div class="panel-header">
+                <h2><i class="fas fa-comment" style="margin-right:8px;color:var(--wechat-green);"></i>消息设置</h2>
+                <button class="close-panel" id="closeMessageSettingsPanel"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="panel-body" id="messageSettingsContent">
+                <div style="display:flex;flex-direction:column;gap:12px;">
+                    <button class="settings-entry" data-action="interact" style="padding:16px;background:var(--wechat-bubble-recv);border:1px solid var(--wechat-border);border-radius:12px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:12px;color:var(--wechat-text-primary);">
+                        <i class="fas fa-hand-pointer" style="font-size:22px;color:var(--wechat-green);"></i>
+                        <span style="font-weight:500;">交互</span>
+                        <span style="margin-left:auto;font-size:13px;color:var(--wechat-text-secondary);"><i class="fas fa-chevron-right"></i></span>
+                    </button>
+                    <button class="settings-entry" data-action="avatar" style="padding:16px;background:var(--wechat-bubble-recv);border:1px solid var(--wechat-border);border-radius:12px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:12px;color:var(--wechat-text-primary);">
+                        <i class="fas fa-user-circle" style="font-size:22px;color:var(--wechat-green);"></i>
+                        <span style="font-weight:500;">头像与背景</span>
+                        <span style="margin-left:auto;font-size:13px;color:var(--wechat-text-secondary);"><i class="fas fa-chevron-right"></i></span>
+                    </button>
+                    <button class="settings-entry" data-action="frequency" style="padding:16px;background:var(--wechat-bubble-recv);border:1px solid var(--wechat-border);border-radius:12px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:12px;color:var(--wechat-text-primary);">
+                        <i class="fas fa-clock" style="font-size:22px;color:var(--wechat-green);"></i>
+                        <span style="font-weight:500;">频率</span>
+                        <span style="margin-left:auto;font-size:13px;color:var(--wechat-text-secondary);"><i class="fas fa-chevron-right"></i></span>
+                    </button>
+                    <button class="settings-entry" data-action="nickname" style="padding:16px;background:var(--wechat-bubble-recv);border:1px solid var(--wechat-border);border-radius:12px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:12px;color:var(--wechat-text-primary);">
+                        <i class="fas fa-user-edit" style="font-size:22px;color:var(--wechat-green);"></i>
+                        <span style="font-weight:500;">修改昵称</span>
+                        <span style="margin-left:auto;font-size:13px;color:var(--wechat-text-secondary);"><i class="fas fa-chevron-right"></i></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 昵称修改面板 ===== -->
+    <div class="panel-overlay" id="nicknamePanel">
+        <div class="panel-sheet">
+            <div class="panel-header">
+                <h2><i class="fas fa-user-edit" style="margin-right:8px;color:var(--wechat-green);"></i>修改昵称</h2>
+                <button class="close-panel" id="closeNicknamePanel"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="panel-body" id="nicknameContent">
+                <div style="display:flex;flex-direction:column;gap:16px;">
+                    <div>
+                        <label style="display:block;font-size:14px;font-weight:500;margin-bottom:4px;">我方昵称</label>
+                        <input type="text" id="myNameInput" style="width:100%;padding:10px 14px;border:0.5px solid var(--wechat-border);border-radius:8px;background:var(--wechat-input-bg);color:var(--wechat-text-primary);font-size:15px;outline:none;" placeholder="输入我方昵称" />
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:14px;font-weight:500;margin-bottom:4px;">对方昵称</label>
+                        <input type="text" id="partnerNameInput" style="width:100%;padding:10px 14px;border:0.5px solid var(--wechat-border);border-radius:8px;background:var(--wechat-input-bg);color:var(--wechat-text-primary);font-size:15px;outline:none;" placeholder="输入对方昵称" />
+                    </div>
+                    <button id="saveNicknameBtn" style="padding:12px;background:var(--wechat-green);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 交互设置面板 ===== -->
+    <div class="panel-overlay" id="interactSettingsPanel">
+        <div class="panel-sheet">
+            <div class="panel-header">
+                <h2><i class="fas fa-hand-pointer" style="margin-right:8px;color:var(--wechat-green);"></i>交互设置</h2>
+                <button class="close-panel" id="closeInteractSettingsPanel"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="panel-body" id="interactSettingsContent">
+                <div style="display:flex;flex-direction:column;gap:16px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--wechat-border);">
+                        <span style="font-weight:500;">引用回复</span>
+                        <label class="switch">
+                            <input type="checkbox" id="quoteToggle" />
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--wechat-border);">
+                        <span style="font-weight:500;">显示时间戳</span>
+                        <label class="switch">
+                            <input type="checkbox" id="timestampToggle" />
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--wechat-border);">
+                        <span style="font-weight:500;">已读不回</span>
+                        <label class="switch">
+                            <input type="checkbox" id="noReplyToggle" />
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--wechat-border);">
+                        <span style="font-weight:500;">消息提醒</span>
+                        <label class="switch">
+                            <input type="checkbox" id="notificationToggle" />
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div style="font-size:11px;color:var(--wechat-text-secondary);opacity:0.7;margin-top:-8px;padding-bottom:4px;">
+                        开启后，对方发送消息时会在系统通知栏弹出提醒（需浏览器授权）
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 频率设置面板 ===== -->
+    <div class="panel-overlay" id="frequencySettingsPanel">
+        <div class="panel-sheet">
+            <div class="panel-header">
+                <h2><i class="fas fa-clock" style="margin-right:8px;color:var(--wechat-green);"></i>频率设置</h2>
+                <button class="close-panel" id="closeFrequencySettingsPanel"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="panel-body" id="frequencySettingsContent">
+                <div style="margin-bottom:20px;">
+                    <div style="font-weight:600;margin-bottom:8px;">回复速度</div>
+                    <div style="display:flex;flex-direction:column;gap:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-size:13px;color:var(--wechat-text-secondary);">最短时间：<span id="replyMinDisplay">1</span>s</span>
+                            <input type="range" id="replyMinSlider" min="1" max="30" value="1" step="1" style="flex:1;margin:0 12px;" />
+                            <span style="font-size:13px;color:var(--wechat-text-secondary);">30s</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-size:13px;color:var(--wechat-text-secondary);">最长时间：<span id="replyMaxDisplay">30</span>s</span>
+                            <input type="range" id="replyMaxSlider" min="30" max="180" value="30" step="1" style="flex:1;margin:0 12px;" />
+                            <span style="font-size:13px;color:var(--wechat-text-secondary);">3min</span>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-bottom:20px;border-top:1px solid var(--wechat-border);padding-top:16px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <span style="font-weight:600;">主动发送</span>
+                        <label class="switch">
+                            <input type="checkbox" id="activeEnabledToggle" />
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+                        <span style="font-size:13px;color:var(--wechat-text-secondary);">时间间隔：<span id="activeIntervalDisplay">5</span> 分钟</span>
+                        <input type="range" id="activeIntervalSlider" min="1" max="300" value="5" step="1" style="flex:1;margin:0 12px;" />
+                        <span style="font-size:13px;color:var(--wechat-text-secondary);">300min</span>
+                    </div>
+                </div>
+                <div style="border-top:1px solid var(--wechat-border);padding-top:16px;">
+                    <div style="font-weight:600;margin-bottom:8px;">合并消息</div>
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-size:13px;">表情合并消息</span>
+                            <label class="switch">
+                                <input type="checkbox" id="mergeEmojiToggle" />
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-size:13px;">字卡拼接</span>
+                            <label class="switch">
+                                <input type="checkbox" id="mergeCardsToggle" />
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div style="font-size:12px;color:var(--wechat-text-secondary);opacity:0.7;margin-top:4px;">
+                            开启后，对方回复时有一定概率将多条消息合并为一条发送
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <!-- ===== 脚本加载 ===== -->
+    <script src="./js/session-manager.js"></script>
+    <script src="./js/card-manager.js"></script>
+    <script src="./js/emoji-manager.js"></script>
+    <script src="./js/avatar-manager.js"></script>
+    <script src="./js/quote-manager.js"></script>
+    <script src="./js/frequency-manager.js"></script>
+    <script src="./js/call-manager.js"></script>
+    <script src="./js/backup-panel.js"></script>
+
+    <!-- =============================================================
+         主程序（修复了功能设置持续重置的问题，移除了备份内联代码）
+         ============================================================= -->
+    <script>
+        (function() {
+            'use strict';
+
+            // ---------- 全局状态 ----------
+            let SESSION_ID = null;
+            let sessionList = [];
+            let messages = [];
+            let partnerName = '梦角';
+            let myName = '我';
+            let isDark = false;
+            let isTyping = false;
+            let typingTimer = null;
+            let lastMsgId = 0;
+            let showTimestamp = true;
+            let noReplyEnabled = false;
+            let notificationEnabled = false;
+            let notificationCount = 0;
+            let notificationTimer = null;
+
+            // DOM 引用
+            const chatArea = document.getElementById('chatArea');
+            const msgInput = document.getElementById('msgInput');
+            const sendBtn = document.getElementById('sendBtn');
+            const contactName = document.getElementById('contactName');
+            const contactStatus = document.getElementById('contactStatus');
+            const themeToggle = document.getElementById('themeToggle');
+            const toast = document.getElementById('toast');
+
+            // ---------- 工具 ----------
+            function getRandomItem(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+            function formatTime(date) {
+                if (!(date instanceof Date)) date = new Date(date);
+                if (isNaN(date.getTime())) return '--:--';
+                const h = String(date.getHours()).padStart(2, '0');
+                const m = String(date.getMinutes()).padStart(2, '0');
+                return h + ':' + m;
+            }
+
+            function getDateKey(date) {
+                if (!(date instanceof Date)) date = new Date(date);
+                if (isNaN(date.getTime())) return '1970-01-01';
+                const d = date;
+                return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2,
+                '0');
+            }
+
+            function showToast(text, type, duration) {
+                type = type || 'info';
+                duration = duration || 2200;
+                toast.textContent = text;
+                toast.className = 'toast ' + type;
+                void toast.offsetWidth;
+                toast.classList.add('show');
+                clearTimeout(toast._hideTimer);
+                toast._hideTimer = setTimeout(() => {
+                    toast.classList.remove('show');
+                }, duration);
+            }
+
+            // ---------- 存储键 ----------
+            function getStorageKey(baseKey) {
+                if (!SESSION_ID) throw new Error('SESSION_ID not initialized');
+                return 'CHAT_APP_V3_' + SESSION_ID + '_' + baseKey;
+            }
+            window.getStorageKey = getStorageKey;
+
+            // ---------- 通知设置 ----------
+            async function loadNotificationSetting() {
+                try {
+                    const key = 'CHAT_APP_V3_notificationEnabled';
+                    const data = await localforage.getItem(key);
+                    notificationEnabled = data?.enabled ?? false;
+                } catch (e) {
+                    notificationEnabled = false;
+                }
+                await saveNotificationSetting();
+            }
+
+            async function saveNotificationSetting() {
+                try {
+                    await localforage.setItem('CHAT_APP_V3_notificationEnabled', { enabled: notificationEnabled });
+                } catch (e) { /* ignore */ }
+            }
+
+            function sendNotification() {
+                if (!notificationEnabled) return;
+                if (!('Notification' in window)) return;
+                if (Notification.permission === 'granted') {
+                    clearTimeout(notificationTimer);
+                    notificationCount++;
+                    notificationTimer = setTimeout(() => {
+                        const count = notificationCount;
+                        notificationCount = 0;
+                        const title = '传讯 · 字卡';
+                        const body = `收到 ${count} 条新消息`;
+                        try {
+                            new Notification(title, { body: body });
+                        } catch (e) { /* ignore */ }
+                    }, 3000);
+                } else if (Notification.permission === 'default') {
+                    Notification.requestPermission();
+                }
+            }
+
+            // ---------- 时间戳设置 ----------
+            async function loadTimestampSetting() {
+                let keyValid = true;
+                try {
+                    const key = getStorageKey('timestampSettings');
+                    const data = await localforage.getItem(key);
+                    if (data && typeof data.enabled === 'boolean') {
+                        showTimestamp = data.enabled;
+                    } else {
+                        showTimestamp = true;
+                    }
+                } catch (e) {
+                    showTimestamp = true;
+                    keyValid = false;
+                }
+                if (keyValid) {
+                    try {
+                        await saveTimestampSetting();
+                    } catch (e) { /* 忽略 */ }
+                }
+            }
+
+            async function saveTimestampSetting() {
+                try {
+                    await localforage.setItem(getStorageKey('timestampSettings'), { enabled: showTimestamp });
+                } catch (e) { console.warn('保存时间戳设置失败:', e); }
+            }
+
+            // ---------- 已读不回 ----------
+            async function loadNoReplySetting() {
+                let keyValid = true;
+                try {
+                    const key = getStorageKey('noReplySettings');
+                    const data = await localforage.getItem(key);
+                    noReplyEnabled = data?.enabled ?? false;
+                } catch (e) {
+                    noReplyEnabled = false;
+                    keyValid = false;
+                }
+                if (keyValid) {
+                    try {
+                        await saveNoReplySetting();
+                    } catch (e) { /* 忽略 */ }
+                }
+            }
+
+            async function saveNoReplySetting() {
+                try {
+                    await localforage.setItem(getStorageKey('noReplySettings'), { enabled: noReplyEnabled });
+                } catch (e) { /* ignore */ }
+            }
+
+            // ---------- 数据加载/保存 ----------
+            async function loadMessages() {
+                try {
+                    const key = getStorageKey('chatData');
+                    const data = await localforage.getItem(key);
+                    if (data) {
+                        messages = data.messages || [];
+                        partnerName = data.partnerName || '梦角';
+                        myName = data.myName || '我';
+                        isDark = data.isDark || false;
+                        lastMsgId = data.lastMsgId || 0;
+                        return true;
+                    }
+                } catch (e) { console.warn('加载消息失败:', e); }
+                return false;
+            }
+
+            async function saveMessages() {
+                try {
+                    const key = getStorageKey('chatData');
+                    const data = {
+                        messages: messages.slice(-500),
+                        partnerName: partnerName,
+                        myName: myName,
+                        isDark: isDark,
+                        lastMsgId: lastMsgId
+                    };
+                    await localforage.setItem(key, data);
+                } catch (e) { console.warn('保存消息失败:', e); }
+            }
+            window.saveMessages = saveMessages;
+
+            // ---------- 渲染消息 ----------
+            function renderMessages() {
+                const myAv = window.avatarManager ? window.avatarManager.getMyAvatar() : null;
+                const partnerAv = window.avatarManager ? window.avatarManager.getPartnerAvatar() : null;
+
+                if (messages.length === 0) {
+                    chatArea.innerHTML = `
+                    <div class="empty-state" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;color:var(--wechat-text-secondary);opacity:0.5;text-align:center;">
+                    <i class="fas fa-comment-dots" style="font-size:48px;margin-bottom:16px;opacity:0.3;"></i>
+                    <p style="font-size:15px;font-weight:500;">开始你们的对话</p>
+                </div>
+                `;
+                return;
+            }
+
+                let html = '';
+                let lastDateKey = '';
+
+                messages.forEach((msg) => {
+                    const dateKey = getDateKey(msg.time);
+                    if (dateKey !== lastDateKey) {
+                        const label = (() => {
+                            const now = new Date();
+                            const today = getDateKey(now);
+                            const yesterday = getDateKey(new Date(now.getTime() - 86400000));
+                            if (dateKey === today) return '今天';
+                            if (dateKey === yesterday) return '昨天';
+                            const d = msg.time;
+                            return d.getFullYear() + '年' + String(d.getMonth() + 1) + '月' + String(d.getDate()) +
+                                '日';
+                        })();
+                        html += `<div class="msg-timestamp">${label}</div>`;
+                        lastDateKey = dateKey;
+                    }
+
+                    if (msg.type === 'system') {
+                        html += `<div class="msg-system">${msg.text}</div>`;
+                        return;
+                    }
+
+                    const isSent = msg.sender === 'me';
+                    const avatarSrc = isSent ? myAv : partnerAv;
+                    const avatarHtml = avatarSrc ? `<img src="${avatarSrc}" alt="" />` : `<i class="fas fa-user"></i>`;
+
+                    let replyHtml = '';
+                    if (msg.replyTo) {
+                        let senderName;
+                        if (msg.replyToSender === 'me') {
+                            senderName = myName;
+                        } else {
+                            senderName = partnerName;
+                        }
+                        const replyContent = msg.replyToText || '';
+                        replyHtml =
+                            `<div class="quote-preview"><span>${senderName}：${replyContent.substring(0, 30)}${replyContent.length > 30 ? '…' : ''}</span></div>`;
+                    }
+
+                    const isImgOnly = msg.image && !msg.text;
+
+                    let bubbleContent = '';
+                    if (msg.text) {
+                        bubbleContent += msg.text.replace(/\n/g, '<br />');
+                    }
+                    if (msg.image) {
+                        const imgHtml =
+                            `<img src="${msg.image}" alt="图片" onclick="window._viewImage && window._viewImage('${msg.image.replace(/'/g, "\\'")}')" loading="lazy" />`;
+                        bubbleContent += bubbleContent ? ('<br />' + imgHtml) : imgHtml;
+                    }
+
+                    const finalBubbleContent = replyHtml + (bubbleContent ? `<div>${bubbleContent}</div>` : '');
+
+                    const bubbleClass = (isSent ? 'sent' : 'recv') + (isImgOnly ? ' img-only' : '');
+
+                    const timeStr = formatTime(msg.time);
+                    const timeHtml = showTimestamp ? `<span>${timeStr}</span>` : '';
+
+                    html += `
+                        <div class="msg-row ${isSent ? 'sent' : 'recv'}" data-msg-id="${msg.id}">
+                            <div class="msg-avatar">${avatarHtml}</div>
+                            <div class="msg-bubble-wrap">
+                                <div class="msg-bubble ${bubbleClass}">${finalBubbleContent}</div>
+                                <div class="msg-meta">
+                                    ${timeHtml}
+                                    ${isSent ? `<span class="read-status ${msg.read ? 'read' : ''}">${msg.read ? '<i class="fas fa-check-circle"></i>' : '<i class="fas fa-check"></i>'}</span>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                chatArea.innerHTML = html;
+                requestAnimationFrame(() => {
+                    chatArea.scrollTop = chatArea.scrollHeight;
+                });
+            }
+            window.renderMessages = renderMessages;
+
+            // ---------- 发送消息 ----------
+            window.sendMessage = async function(text, image) {
+                text = (text || '').trim();
+                if (!text && !image) return false;
+
+                let quoted = null;
+                if (window.quoteManager) {
+                    quoted = window.quoteManager.getQuotedMessage();
+                }
+
+                const msg = {
+                    id: ++lastMsgId,
+                    sender: 'me',
+                    text: text || '',
+                    image: image || null,
+                    time: new Date(),
+                    read: false,
+                    type: 'normal',
+                };
+                if (quoted) {
+                    msg.replyTo = quoted.id;
+                    msg.replyToSender = quoted.sender;
+                    msg.replyToText = quoted.text || (quoted.image ? '[图片]' : '');
+                    if (window.quoteManager) window.quoteManager.clearQuote();
+                }
+
+                messages.push(msg);
+                renderMessages();
+                await saveMessages();
+
+                setTimeout(async () => {
+                    msg.read = true;
+                    renderMessages();
+                    await saveMessages();
+                }, 800 + Math.random() * 1200);
+
+                triggerReply(false);
+                return true;
+            };
+
+            // ---------- 添加外部消息 ----------
+            window.addMessage = function(text, sender, type) {
+                sender = sender || 'me';
+                type = type || 'normal';
+                const msg = {
+                    id: ++lastMsgId,
+                    sender: sender,
+                    text: text || '',
+                    image: null,
+                    time: new Date(),
+                    read: sender === 'me' ? false : true,
+                    type: type
+                };
+                messages.push(msg);
+                renderMessages();
+                saveMessages();
+                if (sender === 'partner') {
+                    sendNotification();
+                }
+            };
+
+            // ---------- 回复逻辑 ----------
+            function triggerReply(fromActive) {
+                if (isTyping) return;
+
+                if (!fromActive && noReplyEnabled) {
+                    if (Math.random() < 0.65) {
+                        return;
+                    }
+                }
+
+                const cards = window.cardManager ? window.cardManager.getCards() : [];
+                const textEmojis = window.cardManager ? window.cardManager.getTextEmojis() : [];
+                const partnerImages = window.emojiManager ? window.emojiManager.getPartnerEmojis() : [];
+
+                const textPool = [...cards, ...textEmojis];
+                const hasText = textPool.length > 0;
+                const hasImage = partnerImages.length > 0;
+
+                if (!hasText && !hasImage) {
+                    setTimeout(async () => {
+                        const hint = {
+                            id: ++lastMsgId,
+                            sender: 'partner',
+                            text: '还没有回复内容呢，快去添加字卡或表情吧！',
+                            image: null,
+                            time: new Date(),
+                            read: true,
+                            type: 'normal',
+                        };
+                        messages.push(hint);
+                        renderMessages();
+                        await saveMessages();
+                        sendNotification();
+                    }, 600);
+                    return;
+                }
+
+                isTyping = true;
+                contactStatus.textContent = '对方正在输入…';
+
+                let delaySec = 2;
+                if (window.frequencyManager) {
+                    delaySec = window.frequencyManager.getReplyDelay();
+                }
+                delaySec = Math.max(1, Math.min(180, delaySec));
+                const delayMs = delaySec * 1000;
+
+                typingTimer = setTimeout(async () => {
+                    isTyping = false;
+                    contactStatus.textContent = '在线';
+
+                    let replyText = null;
+                    let replyImage = null;
+
+                    if (window.frequencyManager && textPool.length > 0) {
+                        const mergeResult = window.frequencyManager.mergeReplies(cards, textEmojis);
+                        if (mergeResult) {
+                            replyText = mergeResult.text;
+                        }
+                    }
+
+                    if (replyText === null && replyImage === null) {
+                        const mixedPool = [];
+                        textPool.forEach(t => mixedPool.push({ type: 'text', data: t }));
+                        partnerImages.forEach(src => mixedPool.push({ type: 'image', data: src }));
+
+                        if (mixedPool.length === 0) return;
+
+                        const chosen = mixedPool[Math.floor(Math.random() * mixedPool.length)];
+                        if (chosen.type === 'text') {
+                            replyText = chosen.data;
+                        } else {
+                            replyImage = chosen.data;
+                        }
+                    }
+
+                    const reply = {
+                        id: ++lastMsgId,
+                        sender: 'partner',
+                        text: replyText || '',
+                        image: replyImage || null,
+                        time: new Date(),
+                        read: true,
+                        type: 'normal',
+                    };
+
+                    if (window.quoteManager && window.quoteManager.getEnabled() && Math.random() < 0.3) {
+                        const lastMyMsg = messages.slice().reverse().find(m => m.sender === 'me');
+                        if (lastMyMsg) {
+                            reply.replyTo = lastMyMsg.id;
+                            reply.replyToSender = lastMyMsg.sender;
+                            reply.replyToText = lastMyMsg.text || (lastMyMsg.image ? '[图片]' : '');
+                        }
+                    }
+
+                    messages.push(reply);
+                    renderMessages();
+                    await saveMessages();
+                    sendNotification();
+
+                    if (Math.random() < 0.2 && textPool.length > 1) {
+                        const extraText = textPool[Math.floor(Math.random() * textPool.length)];
+                        if (extraText) {
+                            const extraMsg = {
+                                id: ++lastMsgId,
+                                sender: 'partner',
+                                text: extraText,
+                                image: null,
+                                time: new Date(),
+                                read: true,
+                                type: 'normal',
+                            };
+                            messages.push(extraMsg);
+                            renderMessages();
+                            await saveMessages();
+                            sendNotification();
+                        }
+                    }
+                }, delayMs);
+            }
+
+            // ---------- 主题切换 ----------
+            function toggleTheme() {
+                isDark = !isDark;
+                document.documentElement.setAttribute('data-theme', isDark ? 'dark' : '');
+                themeToggle.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+                saveMessages();
+            }
+            window.toggleTheme = toggleTheme;
+
+            // ---------- 昵称修改 ----------
+            function openNicknamePanel() {
+                document.getElementById('myNameInput').value = myName;
+                document.getElementById('partnerNameInput').value = partnerName;
+                document.getElementById('nicknamePanel').classList.add('open');
+            }
+
+            async function saveNickname() {
+                const newMy = document.getElementById('myNameInput').value.trim() || '我';
+                const newPartner = document.getElementById('partnerNameInput').value.trim() || '梦角';
+                if (newMy === myName && newPartner === partnerName) {
+                    showToast('昵称未改变', 'info');
+                    return;
+                }
+                myName = newMy;
+                partnerName = newPartner;
+                await saveMessages();
+                contactName.textContent = partnerName;
+                renderMessages();
+                document.getElementById('nicknamePanel').classList.remove('open');
+                showToast('昵称已更新', 'success');
+            }
+
+            // ---------- 初始化 ----------
+            async function init() {
+                // 1. 初始化会话（设置 SESSION_ID）
+                await window.sessionManager.initializeSession();
+                SESSION_ID = window.sessionManager.getCurrentSessionId();
+                sessionList = window.sessionManager.getSessionList();
+
+                // 2. 挂载全局存储键生成器
+                window.getSessionId = function() { return SESSION_ID; };
+                window.getPartnerName = function() { return partnerName; };
+                window.getMyName = function() { return myName; };
+                window.getStorageKey = getStorageKey;
+
+                // ★ 开放 setter 供备份面板等模块修改昵称
+                window.setPartnerName = function(name) { partnerName = name; };
+                window.setMyName = function(name) { myName = name; };
+
+                // 3. 加载各模块设置
+                if (window.frequencyManager) {
+                    await window.frequencyManager.load();
+                    if (typeof renderFrequencyPanel === 'function') renderFrequencyPanel();
+                }
+                if (window.quoteManager && typeof window.quoteManager.loadSettings === 'function') {
+                    await window.quoteManager.loadSettings();
+                }
+
+                // 4. 其他设置加载
+                await loadTimestampSetting();
+                await loadNoReplySetting();
+                await loadNotificationSetting();
+
+                const hasData = await loadMessages();
+                if (!hasData) {
+                    messages = [];
+                    await saveMessages();
+                }
+
+                // 重新加载头像、表情等
+                if (window.avatarManager && typeof window.avatarManager.reload === 'function') {
+                    await window.avatarManager.reload();
+                }
+                if (window.emojiManager && typeof window.emojiManager.reload === 'function') {
+                    await window.emojiManager.reload();
+                }
+
+                if (isDark) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+                }
+
+                contactName.textContent = partnerName;
+                renderMessages();
+
+                if (window.cardManager && typeof window.cardManager.reload === 'function') {
+                    await window.cardManager.reload();
+                }
+
+                if (window.frequencyManager) {
+                    window.frequencyManager.startActiveTimer(() => {
+                        triggerReply(true);
+                    });
+                }
+
+                // 挂载按钮事件
+                sendBtn.addEventListener('click', function() {
+                    const text = msgInput.value;
+                    if (text.trim()) {
+                        window.sendMessage(text);
+                        msgInput.value = '';
+                        msgInput.style.height = 'auto';
+                        msgInput.focus();
+                    }
+                });
+
+                msgInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendBtn.click();
+                    }
+                });
+
+                msgInput.addEventListener('input', function() {
+                    this.style.height = 'auto';
+                    this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+                });
+
+                themeToggle.addEventListener('click', toggleTheme);
+
+                document.getElementById('settingsBtn').addEventListener('click', function() {
+                    document.getElementById('settingsPanel').classList.add('open');
+                });
+
+                document.querySelectorAll('#settingsContent .settings-entry').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const action = this.dataset.action;
+                        document.getElementById('settingsPanel').classList.remove('open');
+                        switch (action) {
+                            case 'session':
+                                window.sessionManager.renderSessionList('sessionListContainer');
+                                document.getElementById('sessionPanel').classList.add('open');
+                                break;
+                            case 'backup':
+                                document.getElementById('backupPanel').classList.add('open');
+                                break;
+                            case 'cards':
+                                if (window.cardManager) window.cardManager.openPanel();
+                                break;
+                            case 'message':
+                                document.getElementById('messageSettingsPanel').classList.add('open');
+                                break;
+                            default: break;
+                        }
+                    });
+                });
+
+                document.querySelectorAll('#messageSettingsContent .settings-entry').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const action = this.dataset.action;
+                        document.getElementById('messageSettingsPanel').classList.remove('open');
+                        if (action === 'interact') {
+                            document.getElementById('interactSettingsPanel').classList.add('open');
+                        } else if (action === 'avatar') {
+                            if (window.avatarManager) window.avatarManager.openPanel();
+                        } else if (action === 'frequency') {
+                            renderFrequencyPanel();
+                            document.getElementById('frequencySettingsPanel').classList.add('open');
+                        } else if (action === 'nickname') {
+                            openNicknamePanel();
+                        }
+                    });
+                });
+
+                document.getElementById('saveNicknameBtn').addEventListener('click', saveNickname);
+                document.querySelectorAll('#nicknamePanel input').forEach(input => {
+                    input.addEventListener('keydown', function(e) {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            saveNickname();
+                        }
+                    });
+                });
+
+                const notifToggle = document.getElementById('notificationToggle');
+                if (notifToggle) {
+                    notifToggle.checked = notificationEnabled;
+                    notifToggle.addEventListener('change', async function() {
+                        notificationEnabled = this.checked;
+                        await saveNotificationSetting();
+                        if (notificationEnabled && Notification.permission === 'default') {
+                            Notification.requestPermission();
+                        }
+                    });
+                }
+
+                const quoteToggle = document.getElementById('quoteToggle');
+                const timestampToggle = document.getElementById('timestampToggle');
+                const noReplyToggle = document.getElementById('noReplyToggle');
+
+                if (quoteToggle && window.quoteManager) {
+                    quoteToggle.checked = window.quoteManager.getEnabled();
+                    quoteToggle.addEventListener('change', function() {
+                        window.quoteManager.setEnabled(this.checked);
+                    });
+                }
+
+                if (timestampToggle) {
+                    timestampToggle.checked = showTimestamp;
+                    timestampToggle.addEventListener('change', async function() {
+                        showTimestamp = this.checked;
+                        await saveTimestampSetting();
+                        renderMessages();
+                    });
+                }
+
+                if (noReplyToggle) {
+                    noReplyToggle.checked = noReplyEnabled;
+                    noReplyToggle.addEventListener('change', async function() {
+                        noReplyEnabled = this.checked;
+                        await saveNoReplySetting();
+                    });
+                }
+
+                if (window.quoteManager) {
+                    await window.quoteManager.loadSettings();
+                    window.quoteManager.initLongPress(chatArea, msgInput);
+                    if (quoteToggle) {
+                        quoteToggle.checked = window.quoteManager.getEnabled();
+                    }
+                    document.addEventListener('quoteSettingsChanged', function(e) {
+                        if (quoteToggle) quoteToggle.checked = e.detail.enabled;
+                    });
+
+                    document.addEventListener('quote-request', function(e) {
+                        const row = e.detail.row;
+                        const msgId = row.dataset.msgId;
+                        if (msgId) {
+                            const found = messages.find(m => m.id == msgId);
+                            if (found) {
+                                window.quoteManager.showQuote(found);
+                                return;
+                            }
+                        }
+                        const bubble = row.querySelector('.msg-bubble');
+                        if (!bubble) return;
+                        const text = bubble.textContent.trim();
+                        let found = null;
+                        for (let msg of messages) {
+                            let msgText = msg.text || '';
+                            if (msgText && msgText.length > 0 && text.includes(msgText.substring(0, 20))) {
+                                found = msg;
+                                break;
+                            }
+                        }
+                        if (found) {
+                            window.quoteManager.showQuote(found);
+                        }
+                    });
+                }
+
+                document.getElementById('emojiBtn').addEventListener('click', function() {
+                    if (window.emojiManager) window.emojiManager.openPanel();
+                    else showToast('表情模块未加载', 'error');
+                });
+
+                contactName.addEventListener('click', async function() {
+                    const newName = prompt('修改对方昵称：', partnerName);
+                    if (newName !== null && newName.trim()) {
+                        partnerName = newName.trim();
+                        contactName.textContent = partnerName;
+                        await saveMessages();
+                        renderMessages();
+                        showToast('昵称已更新', 'success');
+                    }
+                });
+
+                window._viewImage = function(src) {
+                    const overlay = document.createElement('div');
+                    overlay.style.cssText =
+                        'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;cursor:pointer;animation:fadeIn 0.2s ease;';
+                    overlay.innerHTML =
+                        `<img src="${src}" style="max-width:92vw;max-height:88vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.6);" />`;
+                    overlay.addEventListener('click', function() {
+                        overlay.remove();
+                    });
+                    document.body.appendChild(overlay);
+                };
+
+                document.getElementById('createSessionBtn').addEventListener('click', async function() {
+                    const name = prompt('请输入新会话名称：', '我的会话');
+                    if (name === null) return;
+                    await window.sessionManager.createAndSwitch(name.trim() || '会话');
+                    SESSION_ID = window.sessionManager.getCurrentSessionId();
+                    sessionList = window.sessionManager.getSessionList();
+                    messages = [];
+                    await saveMessages();
+                    renderMessages();
+                    document.getElementById('sessionPanel').classList.remove('open');
+                    showToast('新会话已创建', 'success');
+                });
+
+                document.addEventListener('sessionChanged', async function(e) {
+                    SESSION_ID = e.detail.sessionId;
+                    sessionList = window.sessionManager.getSessionList();
+                    window.getSessionId = function() { return SESSION_ID; };
+                    
+                    if (window.frequencyManager) {
+                        await window.frequencyManager.load();
+                        window.frequencyManager.restartActiveTimer(() => {
+                            triggerReply(true);
+                        });
+                    }
+                    await loadTimestampSetting();
+                    if (timestampToggle) timestampToggle.checked = showTimestamp;
+                    await loadNoReplySetting();
+                    if (noReplyToggle) noReplyToggle.checked = noReplyEnabled;
+
+                    const hasData = await loadMessages();
+                    if (!hasData) {
+                        messages = [];
+                        await saveMessages();
+                    }
+                    contactName.textContent = partnerName;
+                    renderMessages();
+                    if (window.cardManager) window.cardManager.reload();
+                    if (window.emojiManager) window.emojiManager.reload();
+                    if (window.avatarManager) window.avatarManager.reload();
+                    showToast('已切换会话', 'success');
+                });
+
+                document.querySelectorAll('.panel-overlay .close-panel').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const panel = this.closest('.panel-overlay');
+                        if (panel) panel.classList.remove('open');
+                    });
+                });
+                document.querySelectorAll('.panel-overlay').forEach(panel => {
+                    panel.addEventListener('click', function(e) {
+                        if (e.target === panel) panel.classList.remove('open');
+                    });
+                });
+
+                document.getElementById('closeFrequencySettingsPanel').addEventListener('click', function() {
+                    document.getElementById('frequencySettingsPanel').classList.remove('open');
+                });
+
+                document.addEventListener('keydown', function(e) {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                        if (document.activeElement === msgInput) {
+                            e.preventDefault();
+                            sendBtn.click();
+                        }
+                    }
+                });
+
+                renderFrequencyPanel();
+
+                setInterval(() => saveMessages(), 30000);
+                window.addEventListener('beforeunload', () => saveMessages());
+
+                msgInput.focus();
+                console.log('✅ 主程序启动完成,会话ID:', SESSION_ID);
+            }
+
+            // ===== 频率面板渲染（修复版） =====
+            function renderFrequencyPanel() {
+                if (!window.frequencyManager) {
+                    console.warn('[频率] frequencyManager 未加载');
+                    return;
+                }
+                const settings = window.frequencyManager.getSettings();
+                console.log('[频率] 渲染面板，当前设置:', settings);
+
+                const minSlider = document.getElementById('replyMinSlider');
+                const minDisplay = document.getElementById('replyMinDisplay');
+                if (minSlider) {
+                    minSlider.value = settings.replyMin || 1;
+                    if (minDisplay) minDisplay.textContent = settings.replyMin || 1;
+                }
+
+                const maxSlider = document.getElementById('replyMaxSlider');
+                const maxDisplay = document.getElementById('replyMaxDisplay');
+                if (maxSlider) {
+                    maxSlider.value = settings.replyMax || 30;
+                    if (maxDisplay) maxDisplay.textContent = settings.replyMax || 30;
+                }
+
+                const activeToggle = document.getElementById('activeEnabledToggle');
+                if (activeToggle) {
+                    activeToggle.checked = settings.activeEnabled || false;
+                }
+
+                const intervalSlider = document.getElementById('activeIntervalSlider');
+                const intervalDisplay = document.getElementById('activeIntervalDisplay');
+                if (intervalSlider) {
+                    intervalSlider.value = settings.activeInterval || 5;
+                    if (intervalDisplay) intervalDisplay.textContent = settings.activeInterval || 5;
+                }
+
+                const mergeEmoji = document.getElementById('mergeEmojiToggle');
+                if (mergeEmoji) {
+                    mergeEmoji.checked = settings.mergeEmoji || false;
+                }
+
+                const mergeCards = document.getElementById('mergeCardsToggle');
+                if (mergeCards) {
+                    mergeCards.checked = settings.mergeCards || false;
+                }
+
+                bindFrequencyEvents();
+            }
+
+            // ===== 频率事件绑定（修复版） =====
+            let frequencyEventsBound = false;
+
+            function bindFrequencyEvents() {
+                if (frequencyEventsBound) {
+                    console.log('[频率] 事件已绑定，跳过');
+                    return;
+                }
+                frequencyEventsBound = true;
+                console.log('[频率] 绑定事件监听');
+
+                const minSlider = document.getElementById('replyMinSlider');
+                const maxSlider = document.getElementById('replyMaxSlider');
+                const minDisplay = document.getElementById('replyMinDisplay');
+                const maxDisplay = document.getElementById('replyMaxDisplay');
+
+                if (minSlider) {
+                    minSlider.addEventListener('input', function() {
+                        const val = parseInt(this.value);
+                        if (minDisplay) minDisplay.textContent = val;
+                        const maxVal = parseInt(maxSlider?.value || 30);
+                        if (val > maxVal && maxSlider) {
+                            maxSlider.value = val;
+                            if (maxDisplay) maxDisplay.textContent = val;
+                        }
+                        if (window.frequencyManager) {
+                            window.frequencyManager.updateSetting('replyMin', val);
+                        }
+                    });
+                }
+
+                if (maxSlider) {
+                    maxSlider.addEventListener('input', function() {
+                        const val = parseInt(this.value);
+                        if (maxDisplay) maxDisplay.textContent = val;
+                        const minVal = parseInt(minSlider?.value || 1);
+                        if (val < minVal && minSlider) {
+                            minSlider.value = val;
+                            if (minDisplay) minDisplay.textContent = val;
+                        }
+                        if (window.frequencyManager) {
+                            window.frequencyManager.updateSetting('replyMax', val);
+                        }
+                    });
+                }
+
+                const activeToggle = document.getElementById('activeEnabledToggle');
+                if (activeToggle) {
+                    activeToggle.addEventListener('change', function() {
+                        if (window.frequencyManager) {
+                            window.frequencyManager.updateSetting('activeEnabled', this.checked);
+                            window.frequencyManager.restartActiveTimer(() => {
+                                if (typeof triggerReply === 'function') {
+                                    triggerReply(true);
+                                }
+                            });
+                        }
+                    });
+                }
+
+                const intervalSlider = document.getElementById('activeIntervalSlider');
+                const intervalDisplay = document.getElementById('activeIntervalDisplay');
+                if (intervalSlider) {
+                    intervalSlider.addEventListener('input', function() {
+                        const val = parseInt(this.value);
+                        if (intervalDisplay) intervalDisplay.textContent = val;
+                        if (window.frequencyManager) {
+                            window.frequencyManager.updateSetting('activeInterval', val);
+                            window.frequencyManager.restartActiveTimer(() => {
+                                if (typeof triggerReply === 'function') {
+                                    triggerReply(true);
+                                }
+                            });
+                        }
+                    });
+                }
+
+                const mergeEmoji = document.getElementById('mergeEmojiToggle');
+                if (mergeEmoji) {
+                    mergeEmoji.addEventListener('change', function() {
+                        if (window.frequencyManager) {
+                            window.frequencyManager.updateSetting('mergeEmoji', this.checked);
+                        }
+                    });
+                }
+
+                const mergeCards = document.getElementById('mergeCardsToggle');
+                if (mergeCards) {
+                    mergeCards.addEventListener('change', function() {
+                        if (window.frequencyManager) {
+                            window.frequencyManager.updateSetting('mergeCards', this.checked);
+                        }
+                    });
+                }
+            }
+
+            document.addEventListener('frequencySettingsChanged', function() {
+                if (document.getElementById('frequencySettingsPanel').classList.contains('open')) {
+                    renderFrequencyPanel();
+                }
+            });
+
+            // ★ 增加 300ms 延迟，模仿新版加载动画，避开手机浏览器的恢复冲突
+            function delayedInit() {
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', () => {
+                        setTimeout(init, 300);
+                    });
+                } else {
+                    setTimeout(init, 300);
+                }
+            }
+            delayedInit();
+        })();
+    </script>
+</body>
+</html>
