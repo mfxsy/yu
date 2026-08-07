@@ -2,8 +2,8 @@
 (function() {
     'use strict';
 
-    // 需要依赖主程序的全局变量：APP_PREFIX, SESSION_ID, messages, partnerName, myName, isDark, lastMsgId
-    // 以及主程序挂载的模块：window.cardManager, window.emojiManager, window.avatarManager
+    // 兼容 window.APP_PREFIX，如果未定义则使用默认值
+    const APP_PREFIX = window.APP_PREFIX || 'CHAT_APP_V3_';
 
     // ===== 存储信息更新 =====
     async function updateStorageInfo() {
@@ -36,12 +36,12 @@
             const fullData = {
                 version: '1.0',
                 exportDate: new Date().toISOString(),
-                sessionId: SESSION_ID,
-                messages: messages,
-                partnerName: partnerName,
-                myName: myName,
-                isDark: isDark,
-                lastMsgId: lastMsgId,
+                sessionId: window.SESSION_ID,
+                messages: window.messages,
+                partnerName: window.partnerName,
+                myName: window.myName,
+                isDark: window.isDark,
+                lastMsgId: window.lastMsgId,
                 cards: cardData,
                 emojis: emojiData,
                 avatars: avatarData
@@ -55,9 +55,9 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            if (typeof showToast === 'function') showToast('全量备份导出成功', 'success');
+            if (typeof window.showToast === 'function') window.showToast('全量备份导出成功', 'success');
         } catch (e) {
-            if (typeof showToast === 'function') showToast('导出失败: ' + e.message, 'error');
+            if (typeof window.showToast === 'function') window.showToast('导出失败: ' + e.message, 'error');
             console.error(e);
         }
     }
@@ -72,19 +72,19 @@
             }
             if (!confirm('导入将覆盖当前所有数据，确定继续吗？')) return;
 
-            messages = data.messages || [];
-            partnerName = data.partnerName || '梦角';
-            myName = data.myName || '我';
-            isDark = data.isDark || false;
-            lastMsgId = data.lastMsgId || 0;
+            window.messages = data.messages || [];
+            window.partnerName = data.partnerName || '梦角';
+            window.myName = data.myName || '我';
+            window.isDark = data.isDark || false;
+            window.lastMsgId = data.lastMsgId || 0;
             
             // 调用主程序的全局保存函数
             if (typeof window.saveMessages === 'function') window.saveMessages();
             else if (typeof localStorage !== 'undefined') {
                 // 降级手动保存
                 try {
-                    const key = `${APP_PREFIX}${SESSION_ID}_chatData`;
-                    const saveData = { messages: messages.slice(-500), partnerName, myName, isDark, lastMsgId };
+                    const key = `${APP_PREFIX}${window.SESSION_ID}_chatData`;
+                    const saveData = { messages: window.messages.slice(-500), partnerName: window.partnerName, myName: window.myName, isDark: window.isDark, lastMsgId: window.lastMsgId };
                     await localforage.setItem(key, saveData);
                 } catch(e){}
             }
@@ -99,7 +99,7 @@
                 await window.avatarManager.importData(data.avatars, 'overwrite');
             }
 
-            if (isDark) {
+            if (window.isDark) {
                 document.documentElement.setAttribute('data-theme', 'dark');
                 const themeToggle = document.getElementById('themeToggle');
                 if (themeToggle) themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
@@ -110,15 +110,15 @@
             }
 
             const contactName = document.getElementById('contactName');
-            if (contactName) contactName.textContent = partnerName;
+            if (contactName) contactName.textContent = window.partnerName;
             
-            if (typeof renderMessages === 'function') renderMessages();
+            if (typeof window.renderMessages === 'function') window.renderMessages();
             if (window.cardManager && typeof window.cardManager.reload === 'function') window.cardManager.reload();
             if (window.emojiManager && typeof window.emojiManager.reload === 'function') window.emojiManager.reload();
             if (window.avatarManager && typeof window.avatarManager.reload === 'function') window.avatarManager.reload();
-            if (typeof showToast === 'function') showToast('全量导入成功', 'success');
+            if (typeof window.showToast === 'function') window.showToast('全量导入成功', 'success');
         } catch (e) {
-            if (typeof showToast === 'function') showToast('导入失败: ' + e.message, 'error');
+            if (typeof window.showToast === 'function') window.showToast('导入失败: ' + e.message, 'error');
             console.error(e);
         }
     }
@@ -129,7 +129,7 @@
         let fileName = '';
         switch (moduleType) {
             case 'messages':
-                data = { messages: messages, partnerName, myName, isDark, lastMsgId };
+                data = { messages: window.messages, partnerName: window.partnerName, myName: window.myName, isDark: window.isDark, lastMsgId: window.lastMsgId };
                 fileName = 'chat-messages.json';
                 break;
             case 'cards':
@@ -165,7 +165,7 @@
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        if (typeof showToast === 'function') showToast(`导出 ${moduleType} 成功`, 'success');
+        if (typeof window.showToast === 'function') window.showToast(`导出 ${moduleType} 成功`, 'success');
     }
 
     // ===== 单独导入功能 =====
@@ -176,23 +176,23 @@
                 case 'messages':
                     if (!data.messages) throw new Error('无效的聊天记录文件');
                     if (mode === 'overwrite') {
-                        messages = data.messages;
-                        partnerName = data.partnerName || '梦角';
-                        myName = data.myName || '我';
-                        isDark = data.isDark || false;
-                        lastMsgId = data.lastMsgId || 0;
+                        window.messages = data.messages;
+                        window.partnerName = data.partnerName || '梦角';
+                        window.myName = data.myName || '我';
+                        window.isDark = data.isDark || false;
+                        window.lastMsgId = data.lastMsgId || 0;
                     } else {
-                        messages = messages.concat(data.messages || []);
-                        if (data.lastMsgId && data.lastMsgId > lastMsgId) lastMsgId = data.lastMsgId;
-                        if (data.partnerName) partnerName = data.partnerName;
-                        if (data.myName) myName = data.myName;
-                        if (data.isDark !== undefined) isDark = data.isDark;
+                        window.messages = window.messages.concat(data.messages || []);
+                        if (data.lastMsgId && data.lastMsgId > window.lastMsgId) window.lastMsgId = data.lastMsgId;
+                        if (data.partnerName) window.partnerName = data.partnerName;
+                        if (data.myName) window.myName = data.myName;
+                        if (data.isDark !== undefined) window.isDark = data.isDark;
                     }
                     if (typeof window.saveMessages === 'function') window.saveMessages();
                     const contactName = document.getElementById('contactName');
-                    if (contactName) contactName.textContent = partnerName;
-                    if (typeof renderMessages === 'function') renderMessages();
-                    if (typeof showToast === 'function') showToast('聊天记录导入成功', 'success');
+                    if (contactName) contactName.textContent = window.partnerName;
+                    if (typeof window.renderMessages === 'function') window.renderMessages();
+                    if (typeof window.showToast === 'function') window.showToast('聊天记录导入成功', 'success');
                     break;
 
                 case 'cards':
@@ -201,12 +201,12 @@
                         const added = await window.cardManager.importFromJson(data, 'cards', mode);
                         if (added > 0) {
                             await window.cardManager.reload();
-                            if (typeof showToast === 'function') showToast(`成功导入 ${added} 条字卡${mode === 'overwrite' ? '（覆盖）' : '（合并）'}`, 'success');
+                            if (typeof window.showToast === 'function') window.showToast(`成功导入 ${added} 条字卡${mode === 'overwrite' ? '（覆盖）' : '（合并）'}`, 'success');
                         } else {
-                            if (typeof showToast === 'function') showToast('没有新字卡可导入（可能已存在）', 'warning');
+                            if (typeof window.showToast === 'function') window.showToast('没有新字卡可导入（可能已存在）', 'warning');
                         }
                     } catch (err) {
-                        if (typeof showToast === 'function') showToast('导入失败: ' + err.message, 'error');
+                        if (typeof window.showToast === 'function') window.showToast('导入失败: ' + err.message, 'error');
                     }
                     break;
 
@@ -216,12 +216,12 @@
                         const added = await window.cardManager.importFromJson(data, 'emojis', mode);
                         if (added > 0) {
                             await window.cardManager.reload();
-                            if (typeof showToast === 'function') showToast(`成功导入 ${added} 条 Emoji${mode === 'overwrite' ? '（覆盖）' : '（合并）'}`, 'success');
+                            if (typeof window.showToast === 'function') window.showToast(`成功导入 ${added} 条 Emoji${mode === 'overwrite' ? '（覆盖）' : '（合并）'}`, 'success');
                         } else {
-                            if (typeof showToast === 'function') showToast('没有新 Emoji 可导入（可能已存在）', 'warning');
+                            if (typeof window.showToast === 'function') window.showToast('没有新 Emoji 可导入（可能已存在）', 'warning');
                         }
                     } catch (err) {
-                        if (typeof showToast === 'function') showToast('导入失败: ' + err.message, 'error');
+                        if (typeof window.showToast === 'function') window.showToast('导入失败: ' + err.message, 'error');
                     }
                     break;
 
@@ -230,8 +230,8 @@
                     result = await window.emojiManager.importData(data, mode);
                     if (result.success) {
                         await window.emojiManager.reload();
-                        if (typeof showToast === 'function') showToast('表情包导入成功', 'success');
-                    } else if (typeof showToast === 'function') showToast(result.message, 'error');
+                        if (typeof window.showToast === 'function') window.showToast('表情包导入成功', 'success');
+                    } else if (typeof window.showToast === 'function') window.showToast(result.message, 'error');
                     break;
 
                 case 'avatar':
@@ -267,16 +267,16 @@
                             contactName.textContent = window.getPartnerName();
                         }
                         if (typeof window.renderMessages === 'function') window.renderMessages();
-                        if (typeof showToast === 'function') showToast('头像、背景及昵称恢复成功', 'success');
+                        if (typeof window.showToast === 'function') window.showToast('头像、背景及昵称恢复成功', 'success');
                     } else {
-                        if (typeof showToast === 'function') showToast('未找到有效的头像/背景或昵称数据', 'warning');
+                        if (typeof window.showToast === 'function') window.showToast('未找到有效的头像/背景或昵称数据', 'warning');
                     }
                     break;
 
-                default: if (typeof showToast === 'function') showToast('未知模块', 'error');
+                default: if (typeof window.showToast === 'function') window.showToast('未知模块', 'error');
             }
         } catch (err) {
-            if (typeof showToast === 'function') showToast('导入失败: ' + err.message, 'error');
+            if (typeof window.showToast === 'function') window.showToast('导入失败: ' + err.message, 'error');
             console.error(err);
         }
     }
@@ -391,7 +391,7 @@
                         const data = JSON.parse(ev.target.result);
                         showImportModeDialog(moduleType, data);
                     } catch (err) {
-                        if (typeof showToast === 'function') showToast('文件格式错误: ' + err.message, 'error');
+                        if (typeof window.showToast === 'function') window.showToast('文件格式错误: ' + err.message, 'error');
                     }
                 };
                 reader.readAsText(file);
@@ -418,10 +418,10 @@
     // ===== 危险操作：清除会话 =====
     async function clearCurrentSession() {
         if (!confirm('确定删除当前会话的所有消息吗？此操作不可撤销。')) return;
-        messages = [];
+        window.messages = [];
         if (typeof window.saveMessages === 'function') window.saveMessages();
-        if (typeof renderMessages === 'function') renderMessages();
-        if (typeof showToast === 'function') showToast('会话消息已清除', 'success');
+        if (typeof window.renderMessages === 'function') window.renderMessages();
+        if (typeof window.showToast === 'function') window.showToast('会话消息已清除', 'success');
     }
 
     // ===== 危险操作：重置数据 =====
@@ -431,7 +431,7 @@
             await localforage.clear();
             location.reload();
         } catch (e) {
-            if (typeof showToast === 'function') showToast('重置失败: ' + e.message, 'error');
+            if (typeof window.showToast === 'function') window.showToast('重置失败: ' + e.message, 'error');
         }
     }
 

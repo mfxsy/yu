@@ -1,4 +1,4 @@
-// card-manager.js（完整修复版）
+// card-manager.js（彻底修复搜索焦点丢失 Bug 的版本）
 (function() {
     'use strict';
 
@@ -25,6 +25,8 @@
         "你值得所有的美好"
     ];
 
+    const DEFAULT_EMOJIS = ['😊', '❤️', '✨', '🌟', '💕', '🌸', '🌙', '⭐', '🌈', '🎵', '💫', '🍀', '🎶', '💖', '🌺'];
+
     let cards = [];
     let textEmojis = [];
     let groups = [];
@@ -49,7 +51,7 @@
             }
         } catch (e) {}
         if (cards.length === 0) cards = [...DEFAULT_CARDS];
-        if (textEmojis.length === 0) textEmojis = ['😊', '❤️', '✨', '🌟', '💕', '🌸', '🌙', '⭐', '🌈', '🎵', '💫', '🍀', '🎶', '💖', '🌺'];
+        if (textEmojis.length === 0) textEmojis = [...DEFAULT_EMOJIS];
 
         try {
             const gKey = getKey('groupData');
@@ -75,6 +77,8 @@
     }
 
     window.cardManager = {
+        searchQuery: '',  // 搜索状态
+
         getCards: () => cards,
         getTextEmojis: () => textEmojis,
         getGroups: () => groups,
@@ -158,13 +162,12 @@
             return added;
         },
 
-                importFromJson: async function(jsonData, tab, mode = 'merge') {
+        importFromJson: async function(jsonData, tab, mode = 'merge') {
             try {
                 const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
                 let items = [];
                 let importedGroups = null;
                 if (tab === 'cards') {
-                    // ★【修复点 1】新增对导出字段 data.cards 的识别
                     if (data.cards) items = data.cards;
                     else if (data.customReplies) items = data.customReplies;
                     else if (data.replies) items = data.replies;
@@ -173,9 +176,10 @@
                     
                     if (data.customReplyGroups) {
                         importedGroups = data.customReplyGroups;
+                    } else if (data.groups) {
+                        importedGroups = data.groups;
                     }
                 } else if (tab === 'emojis') {
-                    // ★【修复点 2】新增对导出字段 data.textEmojis 的识别
                     if (data.textEmojis) items = data.textEmojis;
                     else if (data.customEmojis) items = data.customEmojis;
                     else if (data.emojis) items = data.emojis;
@@ -241,12 +245,13 @@
             } catch (e) { throw e; }
         },
 
-        removeCard: async function(index) {
-            if (index >= 0 && index < cards.length) {
+        // 删除字卡
+        removeCard: async function(text) {
+            const idx = cards.indexOf(text);
+            if (idx !== -1) {
                 if (confirm('确定删除这条字卡吗？')) {
-                    const text = cards[index];
-                    cards.splice(index, 1);
-                    groups.forEach(g => { const idx = g.items.indexOf(text); if (idx!==-1) g.items.splice(idx,1); });
+                    cards.splice(idx, 1);
+                    groups.forEach(g => { const i = g.items.indexOf(text); if (i!==-1) g.items.splice(i,1); });
                     await saveData();
                     await saveGroups();
                     return true;
@@ -255,12 +260,14 @@
             }
             return false;
         },
-        editCard: async function(index, newText) {
+        // 编辑字卡
+        editCard: async function(text, newText) {
             newText = newText.trim();
-            if (index >= 0 && index < cards.length && newText) {
-                const old = cards[index];
-                cards[index] = newText;
-                groups.forEach(g => { const idx = g.items.indexOf(old); if (idx!==-1) g.items[idx] = newText; });
+            if (!text || !newText) return false;
+            const idx = cards.indexOf(text);
+            if (idx !== -1 && newText) {
+                cards[idx] = newText;
+                groups.forEach(g => { const i = g.items.indexOf(text); if (i!==-1) g.items[i] = newText; });
                 await saveData();
                 await saveGroups();
                 return true;
@@ -277,10 +284,12 @@
             }
             return false;
         },
-        removeTextEmoji: async function(index) {
-            if (index >= 0 && index < textEmojis.length) {
+        // 删除 Emoji
+        removeTextEmoji: async function(text) {
+            const idx = textEmojis.indexOf(text);
+            if (idx !== -1) {
                 if (confirm('确定删除？')) {
-                    textEmojis.splice(index, 1);
+                    textEmojis.splice(idx, 1);
                     await saveData();
                     return true;
                 }
@@ -288,11 +297,22 @@
             }
             return false;
         },
-        editTextEmoji: async function(index, newEmoji) {
+        // 编辑 Emoji
+        editTextEmoji: async function(text, newEmoji) {
             newEmoji = newEmoji.trim();
-            if (index >= 0 && index < textEmojis.length && newEmoji) {
-                if (textEmojis.includes(newEmoji) && textEmojis[index] !== newEmoji) return false;
-                textEmojis[index] = newEmoji;
+            if (!text || !newEmoji) return false;
+            const idx = textEmojis.indexOf(text);
+            if (idx !== -1 && newEmoji) {
+                if (textEmojis.includes(newEmoji) && text !== newEmoji) return false;
+                textEmojis[idx] = newEmoji;
+                await saveData();
+                return true;
+            }
+            return false;
+        },
+        resetEmojisToDefault: async function() {
+            if (confirm('恢复默认 Emoji？')) {
+                textEmojis = [...DEFAULT_EMOJIS];
                 await saveData();
                 return true;
             }
@@ -340,6 +360,7 @@
             return false;
         },
         openPanel: function() {
+            this.searchQuery = '';
             filterGroupId = null;
             showGroupTabs = false;
             renderPanel();
@@ -347,6 +368,7 @@
         },
         switchTab: function(tab) {
             currentTab = tab;
+            this.searchQuery = '';
             filterGroupId = null;
             showGroupTabs = false;
             renderPanel();
@@ -358,12 +380,13 @@
         renderPanel: renderPanel
     };
 
-    // ===== 渲染函数 =====
+    // ===== 渲染核心函数（重写稳定版） =====
     async function renderPanel() {
         const container = document.getElementById('cardListContainer');
         const countEl = document.getElementById('cardCount');
         if (!container) return;
 
+        // 更新 Tab 样式
         const tabs = document.querySelectorAll('#cardPanel .card-tab-btn');
         tabs.forEach(btn => {
             btn.classList.toggle('active', btn.dataset.tab === currentTab);
@@ -375,188 +398,87 @@
         }
         updateGroupSelectOptions();
 
+        // 统一恢复默认按钮文字
+        const resetBtn = document.getElementById('resetDefaultCards');
+        if (resetBtn) resetBtn.textContent = '恢复默认';
+
+        // 获取搜索关键字
+        const searchQuery = window.cardManager.searchQuery || '';
+        let displayItems = [];
         if (currentTab === 'cards') {
-            renderCardTab(container, countEl);
+            displayItems = searchQuery ? cards.filter(c => c.includes(searchQuery)) : cards;
         } else {
-            renderEmojiTab(container, countEl);
+            displayItems = searchQuery ? textEmojis.filter(e => e.includes(searchQuery)) : textEmojis;
         }
-    }
 
-    function renderCardTab(container, countEl) {
-        const isGroupMode = showGroupTabs;
-        const isFiltered = filterGroupId !== null;
-
-        let html = '';
-
-        html += `
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <div style="display:flex;gap:10px;flex:1;">
-            <button class="filter-btn ${!isGroupMode ? 'active' : ''}" data-filter="all" style="flex:1;padding:6px 0;border-radius:20px;border:1px solid var(--wechat-border);background:${!isGroupMode ? 'var(--wechat-green)' : 'transparent'};color:${!isGroupMode ? '#fff' : 'var(--wechat-text-primary)'};cursor:pointer;font-weight:500;">未分组</button>
-            <button class="filter-btn ${isGroupMode ? 'active' : ''}" data-filter="grouped" style="flex:1;padding:6px 0;border-radius:20px;border:1px solid var(--wechat-border);background:${isGroupMode ? 'var(--wechat-green)' : 'transparent'};color:${isGroupMode ? '#fff' : 'var(--wechat-text-primary)'};cursor:pointer;font-weight:500;">已分组</button>
-        </div>
-            ${!isGroupMode ? `<button id="openGroupManagerBtn" style="padding:4px 12px;background:var(--wechat-green);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;">分组管理</button>` : ''}
-        </div>
-            ${!isGroupMode ? `<div style="text-align:left;font-size:13px;color:var(--wechat-text-secondary);margin-bottom:8px;">${cards.length}个</div>` : ''}
-    `;
-
-        if (isGroupMode) {
-            if (!isFiltered) {
-                html += `<div style="overflow-x:auto;white-space:nowrap;padding-bottom:6px;margin-bottom:10px;display:flex;gap:8px;scrollbar-width:none;-webkit-overflow-scrolling:touch;">
-                    <style>#cardListContainer .group-tab::-webkit-scrollbar{display:none;}</style>
-                `;
-                if (groups.length === 0) {
-                    html += `<span style="font-size:12px;color:var(--wechat-text-secondary);">暂无分组，请先创建分组</span>`;
-                } else {
-                    groups.forEach(g => {
-                        html += `<button class="group-tab" data-groupid="${g.id}" style="flex-shrink:0;padding:4px 14px;border-radius:20px;border:1px solid var(--wechat-border);background:transparent;color:var(--wechat-text-primary);cursor:pointer;font-size:12px;">${g.name} (${g.items.length})</button>`;
-                    });
-                }
-                html += `</div>`;
-                html += `<div class="card-empty" style="padding:40px 0;"><i class="fas fa-hand-pointer"></i><p>请选择分组</p></div>`;
-            } else {
-                // 【修复点1】强制转为字符串比较
-                const group = groups.find(g => String(g.id) === String(filterGroupId));
-                if (group) {
-                    const filteredCards = cards.filter(c => group.items.includes(c));
-                    html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                        <span style="font-size:14px;font-weight:600;color:var(--wechat-green);">${group.name}（${filteredCards.length} 个）</span>
-                        <button id="clearFilterBtn" style="padding:4px 12px;background:none;border:1px solid var(--wechat-border);border-radius:6px;font-size:12px;cursor:pointer;color:var(--wechat-text-secondary);">取消筛选</button>
-                    </div>`;
-                    if (filteredCards.length === 0) {
-                        html += `<div class="card-empty"><i class="fas fa-book-open"></i><p>该分组暂无字卡</p></div>`;
-                    } else {
-                        const groupMap = {};
-                        for (const g of groups) {
-                            for (const item of g.items) {
-                                if (!groupMap[item]) groupMap[item] = [];
-                                groupMap[item].push(g);
-                            }
-                        }
-                        filteredCards.forEach((item, idx) => {
-                            const display = item.length > 60 ? item.slice(0, 60) + '…' : item;
-                            let groupHtml = '';
-                            if (groupMap[item]) {
-                                const groupNames = groupMap[item].map(g => `<span style="display:inline-block;background:rgba(0,0,0,0.06);padding:0 6px;border-radius:4px;font-size:10px;margin-right:4px;">${g.name}</span>`).join('');
-                                groupHtml = `<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:2px;">${groupNames}</div>`;
-                            }
-                            html += `
-                                <div class="card-item">
-                                    <div style="flex:1;min-width:0;">
-                                        <span class="card-text">${display}</span>
-                                        ${groupHtml}
-                                    </div>
-                                    <div class="card-actions">
-                                        <button class="edit-btn" data-idx="${idx}" title="编辑"><i class="fas fa-pen"></i></button>
-                                        <button class="group-btn" data-idx="${idx}" title="分配分组"><i class="fas fa-tag"></i></button>
-                                        <button class="del-btn" data-idx="${idx}" title="删除"><i class="fas fa-trash-alt"></i></button>
-                                    </div>
-                                </div>
-                            `;
-                        });
-                    }
-                } else {
-                    html += `<div class="card-empty"><i class="fas fa-exclamation-triangle"></i><p>分组不存在</p></div>`;
-                }
-            }
+        // 构建列表 HTML
+        let listHtml = '';
+        if (currentTab === 'cards') {
+            listHtml = buildCardListHtml(displayItems);
         } else {
-            if (cards.length === 0) {
-                html += `<div class="card-empty"><i class="fas fa-book-open"></i><p>字卡库为空</p></div>`;
-            } else {
-                const groupMap = {};
-                for (const g of groups) {
-                    for (const item of g.items) {
-                        if (!groupMap[item]) groupMap[item] = [];
-                        groupMap[item].push(g);
-                    }
-                }
-                cards.forEach((item, idx) => {
-                    const display = item.length > 60 ? item.slice(0, 60) + '…' : item;
-                    let groupHtml = '';
-                    if (groupMap[item]) {
-                        const groupNames = groupMap[item].map(g => `<span style="display:inline-block;background:rgba(0,0,0,0.06);padding:0 6px;border-radius:4px;font-size:10px;margin-right:4px;">${g.name}</span>`).join('');
-                        groupHtml = `<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:2px;">${groupNames}</div>`;
-                    }
-                    html += `
-                        <div class="card-item">
-                            <div style="flex:1;min-width:0;">
-                                <span class="card-text">${display}</span>
-                                ${groupHtml}
-                            </div>
-                            <div class="card-actions">
-                                <button class="edit-btn" data-idx="${idx}" title="编辑"><i class="fas fa-pen"></i></button>
-                                <button class="group-btn" data-idx="${idx}" title="分配分组"><i class="fas fa-tag"></i></button>
-                                <button class="del-btn" data-idx="${idx}" title="删除"><i class="fas fa-trash-alt"></i></button>
-                            </div>
-                        </div>
-                    `;
+            listHtml = buildEmojiListHtml(displayItems);
+        }
+
+        // ★ 核心修复：只维护一份常驻 DOM 结构的搜索栏，不再清空重建 ★
+        let toolbar = document.getElementById('cardToolbar');
+        if (!toolbar) {
+            const toolbarHtml = `
+                <div id="cardToolbar" style="display:flex;align-items:center;gap:8px;margin-bottom:12px;justify-content:flex-start;flex-shrink:0;">
+                    <div style="position:relative;flex:1;">
+                        <i class="fas fa-search" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--wechat-text-secondary);font-size:13px;"></i>
+                        <input id="searchInput" placeholder="搜索..." style="width:100%;padding:6px 12px 6px 30px;border:1px solid var(--wechat-border);border-radius:20px;background:var(--wechat-input-bg);color:var(--wechat-text-primary);outline:none;font-size:13px;transition:border-color 0.2s;" />
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('afterbegin', toolbarHtml);
+            toolbar = document.getElementById('cardToolbar');
+
+            // 搜索监听事件只绑定一次
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.addEventListener('input', function(e) {
+                    const val = this.value;
+                    window.cardManager.searchQuery = val;
+                    renderPanel(); // 触发刷新，仅更新下方列表
                 });
             }
+        } else {
+            // 切换 Tab 时保证输入框的内容同步
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput && searchInput.value !== searchQuery) {
+                searchInput.value = searchQuery;
+            }
         }
 
-        container.innerHTML = html;
-        if (countEl) countEl.textContent = `共 ${cards.length} 条`;
-
-        container.querySelectorAll('.filter-btn[data-filter="all"]').forEach(btn => {
-            btn.addEventListener('click', function() {
-                showGroupTabs = false;
-                filterGroupId = null;
-                renderPanel();
-            });
-        });
-
-        container.querySelectorAll('.filter-btn[data-filter="grouped"]').forEach(btn => {
-            btn.addEventListener('click', function() {
-                if (showGroupTabs && filterGroupId !== null) {
-                    filterGroupId = null;
-                    renderPanel();
-                } else if (showGroupTabs && filterGroupId === null) {
-                    showGroupTabs = false;
-                    renderPanel();
-                } else {
-                    showGroupTabs = true;
-                    filterGroupId = null;
-                    renderPanel();
-                }
-            });
-        });
-
-        container.querySelectorAll('.group-tab').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const gid = this.dataset.groupid;
-                // 【修复点2】强制转为字符串存储
-                if (filterGroupId === gid) {
-                    filterGroupId = null;
-                } else {
-                    filterGroupId = String(gid);
-                }
-                renderPanel();
-            });
-        });
-
-        const clearBtn = container.querySelector('#clearFilterBtn');
-        if (clearBtn) {
-            clearBtn.addEventListener('click', function() {
-                filterGroupId = null;
-                renderPanel();
-            });
+        // ★ 移除旧列表，保留顶部的工具栏 ★
+        while (toolbar.nextSibling) {
+            toolbar.parentNode.removeChild(toolbar.nextSibling);
         }
 
-        const mgrBtn = container.querySelector('#openGroupManagerBtn');
-        if (mgrBtn) {
-            mgrBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                showGroupManager();
-            });
+        // 插入新列表
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = listHtml;
+        container.appendChild(wrapper);
+
+        // 更新底部计数
+        if (countEl) {
+            countEl.textContent = `共 ${displayItems.length} 条`;
         }
 
-        container.querySelectorAll('.edit-btn').forEach(btn => {
-            btn.addEventListener('click', async function(e) {
-                e.stopPropagation();
-                const idx = parseInt(this.dataset.idx);
-                const current = cards[idx];
-                const newText = prompt('编辑字卡内容：', current);
+        // 绑定列表元素事件（委托）
+        container.addEventListener('click', async function(e) {
+            const btn = e.target.closest('.edit-btn');
+            if (btn) {
+                const text = btn.dataset.text;
+                const current = text;
+                const newText = prompt('编辑内容：', current);
                 if (newText !== null && newText.trim()) {
-                    const success = await window.cardManager.editCard(idx, newText.trim());
+                    let success = false;
+                    if (currentTab === 'cards') {
+                        success = await window.cardManager.editCard(current, newText.trim());
+                    } else {
+                        success = await window.cardManager.editTextEmoji(current, newText.trim());
+                    }
                     if (success) {
                         renderPanel();
                         showToast('已更新', 'success');
@@ -564,87 +486,98 @@
                         showToast('更新失败', 'error');
                     }
                 }
-            });
+            }
         });
 
-        container.querySelectorAll('.del-btn').forEach(btn => {
-            btn.addEventListener('click', async function(e) {
-                e.stopPropagation();
-                const idx = parseInt(this.dataset.idx);
-                const success = await window.cardManager.removeCard(idx);
+        container.addEventListener('click', async function(e) {
+            const btn = e.target.closest('.del-btn');
+            if (btn) {
+                const text = btn.dataset.text;
+                let success = false;
+                if (currentTab === 'cards') {
+                    success = await window.cardManager.removeCard(text);
+                } else {
+                    success = await window.cardManager.removeTextEmoji(text);
+                }
                 if (success) {
                     renderPanel();
                     showToast('已删除', 'success');
                 }
-            });
+            }
         });
 
-        container.querySelectorAll('.group-btn').forEach(btn => {
-            btn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                const idx = parseInt(this.dataset.idx);
-                const cardText = cards[idx];
+        container.addEventListener('click', function(e) {
+            const btn = e.target.closest('.group-btn');
+            if (btn) {
+                const cardText = btn.dataset.text;
                 showGroupPicker(cardText);
-            });
+            }
         });
     }
 
-    function renderEmojiTab(container, countEl) {
-        let html = `
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                <span style="font-size:13px;font-weight:500;color:var(--wechat-text-secondary);"> ${textEmojis.length}个 </span>
-            </div>
-        `;
-        if (textEmojis.length === 0) {
-            html += `<div class="card-empty"><i class="fas fa-smile"></i><p>Emoji 库为空</p></div>`;
-        } else {
-            textEmojis.forEach((item, idx) => {
-                const display = item.length > 60 ? item.slice(0, 60) + '…' : item;
-                html += `
-                    <div class="card-item">
-                        <span class="card-text">${display}</span>
-                        <div class="card-actions">
-                            <button class="edit-emoji-btn" data-idx="${idx}" title="编辑"><i class="fas fa-pen"></i></button>
-                            <button class="del-btn" data-idx="${idx}" title="删除"><i class="fas fa-trash-alt"></i></button>
-                        </div>
-                    </div>
-                `;
-            });
+    // ===== 构建列表 HTML =====
+    function buildCardListHtml(displayItems) {
+        let html = '';
+        if (displayItems.length === 0) {
+            html = `<div class="card-empty"><i class="fas fa-book-open"></i><p>未找到匹配的字卡</p></div>`;
+            return html;
         }
-        container.innerHTML = html;
-        if (countEl) countEl.textContent = `共 ${textEmojis.length} 条`;
 
-        container.querySelectorAll('.edit-emoji-btn').forEach(btn => {
-            btn.addEventListener('click', async function(e) {
-                e.stopPropagation();
-                const idx = parseInt(this.dataset.idx);
-                const current = textEmojis[idx];
-                const newEmoji = prompt('编辑 Emoji：', current);
-                if (newEmoji !== null && newEmoji.trim()) {
-                    const success = await window.cardManager.editTextEmoji(idx, newEmoji.trim());
-                    if (success) {
-                        renderPanel();
-                        showToast('已更新', 'success');
-                    } else {
-                        showToast('更新失败（可能已存在）', 'error');
-                    }
-                }
-            });
-        });
+        const groupMap = {};
+        for (const g of groups) {
+            for (const item of g.items) {
+                if (!groupMap[item]) groupMap[item] = [];
+                groupMap[item].push(g);
+            }
+        }
 
-        container.querySelectorAll('.del-btn').forEach(btn => {
-            btn.addEventListener('click', async function(e) {
-                e.stopPropagation();
-                const idx = parseInt(this.dataset.idx);
-                const success = await window.cardManager.removeTextEmoji(idx);
-                if (success) {
-                    renderPanel();
-                    showToast('已删除', 'success');
-                }
-            });
+        displayItems.forEach(item => {
+            const display = item.length > 60 ? item.slice(0, 60) + '…' : item;
+            let groupHtml = '';
+            if (groupMap[item]) {
+                const groupNames = groupMap[item].map(g => `<span style="display:inline-block;background:rgba(0,0,0,0.06);padding:0 6px;border-radius:4px;font-size:10px;margin-right:4px;">${g.name}</span>`).join('');
+                groupHtml = `<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:2px;">${groupNames}</div>`;
+            }
+            html += `
+                <div class="card-item">
+                    <div style="flex:1;min-width:0;">
+                        <span class="card-text">${display}</span>
+                        ${groupHtml}
+                    </div>
+                    <div class="card-actions">
+                        <button class="edit-btn" data-text="${item}" title="编辑"><i class="fas fa-pen"></i></button>
+                        <button class="group-btn" data-text="${item}" title="分配分组"><i class="fas fa-tag"></i></button>
+                        <button class="del-btn" data-text="${item}" title="删除"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                </div>
+            `;
         });
+        return html;
     }
 
+    function buildEmojiListHtml(displayItems) {
+        let html = '';
+        if (displayItems.length === 0) {
+            html = `<div class="card-empty"><i class="fas fa-smile"></i><p>未找到匹配的 Emoji</p></div>`;
+            return html;
+        }
+
+        displayItems.forEach(item => {
+            const display = item.length > 60 ? item.slice(0, 60) + '…' : item;
+            html += `
+                <div class="card-item">
+                    <span class="card-text">${display}</span>
+                    <div class="card-actions">
+                        <button class="edit-btn" data-text="${item}" title="编辑"><i class="fas fa-pen"></i></button>
+                        <button class="del-btn" data-text="${item}" title="删除"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                </div>
+            `;
+        });
+        return html;
+    }
+
+    // ===== 辅助功能函数 =====
     function updateGroupSelectOptions() {
         const select = document.getElementById('addCardGroupSelect');
         if (!select) return;
@@ -724,106 +657,6 @@
         overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
     }
 
-    function showGroupManager() {
-        const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;';
-        const dialog = document.createElement('div');
-        dialog.style.cssText = 'background:var(--wechat-bg);border-radius:16px;padding:20px;width:90%;max-width:360px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 30px rgba(0,0,0,0.3);';
-        const title = document.createElement('h3');
-        title.textContent = '分组管理';
-        title.style.marginBottom = '12px';
-        const list = document.createElement('div');
-        list.style.cssText = 'flex:1;overflow-y:auto;margin-bottom:12px;';
-
-        const close = () => overlay.remove();
-
-        function renderGroupList() {
-            list.innerHTML = '';
-            if (groups.length === 0) {
-                list.innerHTML = '<p style="color:var(--wechat-text-secondary);text-align:center;padding:12px 0;">暂无分组</p>';
-                return;
-            }
-            groups.forEach(g => {
-                const item = document.createElement('div');
-                item.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--wechat-border);';
-                const nameSpan = document.createElement('span');
-                nameSpan.textContent = g.name + ` (${g.items.length})`;
-                nameSpan.style.flex = '1';
-                const renameBtn = document.createElement('button');
-                renameBtn.innerHTML = '<i class="fas fa-pen"></i>';
-                renameBtn.style.cssText = 'background:none;border:none;cursor:pointer;padding:4px 6px;';
-                renameBtn.title = '重命名';
-                renameBtn.addEventListener('click', async function() {
-                    const newName = prompt('输入新分组名称：', g.name);
-                    if (newName !== null && newName.trim()) {
-                        if (await window.cardManager.renameGroup(g.id, newName.trim())) {
-                            renderGroupList();
-                            renderPanel();
-                            showToast('分组已重命名', 'success');
-                        } else {
-                            showToast('重命名失败（可能名称已存在）', 'error');
-                        }
-                    }
-                });
-                const delBtn = document.createElement('button');
-                delBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
-                delBtn.style.cssText = 'background:none;border:none;cursor:pointer;color:#fa5151;padding:4px 6px;';
-                delBtn.title = '删除分组';
-                delBtn.addEventListener('click', async function() {
-                    if (await window.cardManager.deleteGroup(g.id)) {
-                        renderGroupList();
-                        renderPanel();
-                        showToast('分组已删除', 'success');
-                    }
-                });
-                item.appendChild(nameSpan);
-                item.appendChild(renameBtn);
-                item.appendChild(delBtn);
-                list.appendChild(item);
-            });
-        }
-
-        const addRow = document.createElement('div');
-        addRow.style.cssText = 'display:flex;gap:8px;margin-bottom:12px;';
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.placeholder = '新分组名称…';
-        input.style.cssText = 'flex:1;padding:8px 12px;border:1px solid var(--wechat-border);border-radius:8px;font-size:14px;background:var(--wechat-input-bg);color:var(--wechat-text-primary);';
-        const addBtn = document.createElement('button');
-        addBtn.textContent = '添加';
-        addBtn.style.cssText = 'padding:8px 16px;border-radius:8px;border:none;background:var(--wechat-green);color:#fff;cursor:pointer;font-weight:600;';
-        addBtn.addEventListener('click', async function() {
-            const name = input.value.trim();
-            if (name) {
-                if (await window.cardManager.addGroup(name)) {
-                    input.value = '';
-                    renderGroupList();
-                    renderPanel();
-                    showToast('分组已创建', 'success');
-                } else {
-                    showToast('创建失败（名称可能已存在）', 'error');
-                }
-            }
-        });
-        input.addEventListener('keydown', e => { if (e.key === 'Enter') addBtn.click(); });
-        addRow.appendChild(input);
-        addRow.appendChild(addBtn);
-
-        const closeBtn = document.createElement('button');
-        closeBtn.textContent = '关闭';
-        closeBtn.style.cssText = 'padding:8px 16px;border-radius:8px;border:1px solid var(--wechat-border);background:none;cursor:pointer;margin-top:8px;';
-        closeBtn.addEventListener('click', close);
-        dialog.appendChild(title);
-        dialog.appendChild(addRow);
-        dialog.appendChild(list);
-        dialog.appendChild(closeBtn);
-        overlay.appendChild(dialog);
-        document.body.appendChild(overlay);
-        overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-
-        renderGroupList();
-    }
-
     function showToast(msg, type) {
         const toast = document.getElementById('toast');
         if (toast) {
@@ -872,30 +705,33 @@
 
         const resetBtn = document.getElementById('resetDefaultCards');
         if (resetBtn) {
+            resetBtn.textContent = '恢复默认';
             resetBtn.addEventListener('click', async function() {
                 if (currentTab === 'cards') {
                     if (await window.cardManager.resetToDefault()) {
                         renderPanel();
                         showToast('已恢复默认字卡', 'success');
                     }
+                } else if (currentTab === 'emojis') {
+                    if (await window.cardManager.resetEmojisToDefault()) {
+                        renderPanel();
+                        showToast('已恢复默认 Emoji', 'success');
+                    }
                 } else {
-                    showToast('该功能仅适用于字卡', 'info');
+                    showToast('该功能仅适用于字卡或 Emoji', 'info');
                 }
             });
         }
 
         const batchBtn = document.getElementById('batchAddBtn');
-        if (batchBtn) {
-            batchBtn.addEventListener('click', showBatchDialog);
-        }
+        if (batchBtn) batchBtn.addEventListener('click', showBatchDialog);
 
         const importBtn = document.getElementById('importJsonBtn');
-        if (importBtn) {
-            importBtn.addEventListener('click', showImportDialog);
-        }
+        if (importBtn) importBtn.addEventListener('click', showImportDialog);
 
         document.querySelectorAll('#cardPanel .card-tab-btn').forEach(btn => {
             btn.addEventListener('click', function() {
+                window.cardManager.searchQuery = '';
                 window.cardManager.switchTab(this.dataset.tab);
             });
         });

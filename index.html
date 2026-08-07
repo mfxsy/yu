@@ -72,7 +72,7 @@
                 <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
                     <button id="batchAddBtn" style="flex:1;padding:6px 12px;background:var(--wechat-green);color:#fff;border:none;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;">批量添加</button>
                     <button id="importJsonBtn" style="flex:1;padding:6px 12px;background:var(--wechat-input-bg);color:var(--wechat-text-primary);border:1px solid var(--wechat-border);border-radius:8px;font-size:12px;cursor:pointer;">导入 JSON</button>
-                    <button id="resetDefaultCards" style="flex:0 0 auto;padding:6px 12px;background:none;border:none;color:var(--wechat-text-secondary);cursor:pointer;font-size:11px;text-decoration:underline;opacity:0.5;">恢复默认字卡</button>
+                    <button id="resetDefaultCards" style="flex:0 0 auto;padding:6px 12px;background:none;border:none;color:var(--wechat-text-secondary);cursor:pointer;font-size:11px;text-decoration:underline;opacity:0.5;">恢复默认</button>
                 </div>
                 <div class="card-bottom-meta">
                     <span id="cardCount">共 0 条</span>
@@ -384,6 +384,7 @@
     <script src="./js/frequency-manager.js"></script>
     <script src="./js/call-manager.js"></script>
     <script src="./js/backup-panel.js"></script>
+    <script src="./js/share-import.js"></script>
 
     <!-- =============================================================
          主程序（修复了功能设置持续重置的问题，移除了备份内联代码）
@@ -392,16 +393,18 @@
         (function() {
             'use strict';
 
-            // ---------- 全局状态 ----------
-            let SESSION_ID = null;
+            // ---------- 全局状态（全部暴露到 window） ----------
+            window.APP_PREFIX = 'CHAT_APP_V3_';
+            window.messages = [];
+            window.partnerName = '梦角';
+            window.myName = '我';
+            window.isDark = false;
+            window.lastMsgId = 0;
+            window.SESSION_ID = null;
+
             let sessionList = [];
-            let messages = [];
-            let partnerName = '梦角';
-            let myName = '我';
-            let isDark = false;
             let isTyping = false;
             let typingTimer = null;
-            let lastMsgId = 0;
             let showTimestamp = true;
             let noReplyEnabled = false;
             let notificationEnabled = false;
@@ -448,18 +451,19 @@
                     toast.classList.remove('show');
                 }, duration);
             }
+            window.showToast = showToast;
 
             // ---------- 存储键 ----------
             function getStorageKey(baseKey) {
-                if (!SESSION_ID) throw new Error('SESSION_ID not initialized');
-                return 'CHAT_APP_V3_' + SESSION_ID + '_' + baseKey;
+                if (!window.SESSION_ID) throw new Error('SESSION_ID not initialized');
+                return window.APP_PREFIX + window.SESSION_ID + '_' + baseKey;
             }
             window.getStorageKey = getStorageKey;
 
             // ---------- 通知设置 ----------
             async function loadNotificationSetting() {
                 try {
-                    const key = 'CHAT_APP_V3_notificationEnabled';
+                    const key = window.APP_PREFIX + 'notificationEnabled';
                     const data = await localforage.getItem(key);
                     notificationEnabled = data?.enabled ?? false;
                 } catch (e) {
@@ -470,7 +474,7 @@
 
             async function saveNotificationSetting() {
                 try {
-                    await localforage.setItem('CHAT_APP_V3_notificationEnabled', { enabled: notificationEnabled });
+                    await localforage.setItem(window.APP_PREFIX + 'notificationEnabled', { enabled: notificationEnabled });
                 } catch (e) { /* ignore */ }
             }
 
@@ -552,11 +556,11 @@
                     const key = getStorageKey('chatData');
                     const data = await localforage.getItem(key);
                     if (data) {
-                        messages = data.messages || [];
-                        partnerName = data.partnerName || '梦角';
-                        myName = data.myName || '我';
-                        isDark = data.isDark || false;
-                        lastMsgId = data.lastMsgId || 0;
+                        window.messages = data.messages || [];
+                        window.partnerName = data.partnerName || '梦角';
+                        window.myName = data.myName || '我';
+                        window.isDark = data.isDark || false;
+                        window.lastMsgId = data.lastMsgId || 0;
                         return true;
                     }
                 } catch (e) { console.warn('加载消息失败:', e); }
@@ -567,11 +571,11 @@
                 try {
                     const key = getStorageKey('chatData');
                     const data = {
-                        messages: messages.slice(-500),
-                        partnerName: partnerName,
-                        myName: myName,
-                        isDark: isDark,
-                        lastMsgId: lastMsgId
+                        messages: window.messages.slice(-500),
+                        partnerName: window.partnerName,
+                        myName: window.myName,
+                        isDark: window.isDark,
+                        lastMsgId: window.lastMsgId
                     };
                     await localforage.setItem(key, data);
                 } catch (e) { console.warn('保存消息失败:', e); }
@@ -583,7 +587,7 @@
                 const myAv = window.avatarManager ? window.avatarManager.getMyAvatar() : null;
                 const partnerAv = window.avatarManager ? window.avatarManager.getPartnerAvatar() : null;
 
-                if (messages.length === 0) {
+                if (window.messages.length === 0) {
                     chatArea.innerHTML = `
                     <div class="empty-state" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;color:var(--wechat-text-secondary);opacity:0.5;text-align:center;">
                     <i class="fas fa-comment-dots" style="font-size:48px;margin-bottom:16px;opacity:0.3;"></i>
@@ -596,7 +600,7 @@
                 let html = '';
                 let lastDateKey = '';
 
-                messages.forEach((msg) => {
+                window.messages.forEach((msg) => {
                     const dateKey = getDateKey(msg.time);
                     if (dateKey !== lastDateKey) {
                         const label = (() => {
@@ -626,9 +630,9 @@
                     if (msg.replyTo) {
                         let senderName;
                         if (msg.replyToSender === 'me') {
-                            senderName = myName;
+                            senderName = window.myName;
                         } else {
-                            senderName = partnerName;
+                            senderName = window.partnerName;
                         }
                         const replyContent = msg.replyToText || '';
                         replyHtml =
@@ -686,7 +690,7 @@
                 }
 
                 const msg = {
-                    id: ++lastMsgId,
+                    id: ++window.lastMsgId,
                     sender: 'me',
                     text: text || '',
                     image: image || null,
@@ -701,7 +705,7 @@
                     if (window.quoteManager) window.quoteManager.clearQuote();
                 }
 
-                messages.push(msg);
+                window.messages.push(msg);
                 renderMessages();
                 await saveMessages();
 
@@ -720,7 +724,7 @@
                 sender = sender || 'me';
                 type = type || 'normal';
                 const msg = {
-                    id: ++lastMsgId,
+                    id: ++window.lastMsgId,
                     sender: sender,
                     text: text || '',
                     image: null,
@@ -728,7 +732,7 @@
                     read: sender === 'me' ? false : true,
                     type: type
                 };
-                messages.push(msg);
+                window.messages.push(msg);
                 renderMessages();
                 saveMessages();
                 if (sender === 'partner') {
@@ -757,7 +761,7 @@
                 if (!hasText && !hasImage) {
                     setTimeout(async () => {
                         const hint = {
-                            id: ++lastMsgId,
+                            id: ++window.lastMsgId,
                             sender: 'partner',
                             text: '还没有回复内容呢，快去添加字卡或表情吧！',
                             image: null,
@@ -765,7 +769,7 @@
                             read: true,
                             type: 'normal',
                         };
-                        messages.push(hint);
+                        window.messages.push(hint);
                         renderMessages();
                         await saveMessages();
                         sendNotification();
@@ -813,7 +817,7 @@
                     }
 
                     const reply = {
-                        id: ++lastMsgId,
+                        id: ++window.lastMsgId,
                         sender: 'partner',
                         text: replyText || '',
                         image: replyImage || null,
@@ -823,7 +827,7 @@
                     };
 
                     if (window.quoteManager && window.quoteManager.getEnabled() && Math.random() < 0.3) {
-                        const lastMyMsg = messages.slice().reverse().find(m => m.sender === 'me');
+                        const lastMyMsg = window.messages.slice().reverse().find(m => m.sender === 'me');
                         if (lastMyMsg) {
                             reply.replyTo = lastMyMsg.id;
                             reply.replyToSender = lastMyMsg.sender;
@@ -831,7 +835,7 @@
                         }
                     }
 
-                    messages.push(reply);
+                    window.messages.push(reply);
                     renderMessages();
                     await saveMessages();
                     sendNotification();
@@ -840,7 +844,7 @@
                         const extraText = textPool[Math.floor(Math.random() * textPool.length)];
                         if (extraText) {
                             const extraMsg = {
-                                id: ++lastMsgId,
+                                id: ++window.lastMsgId,
                                 sender: 'partner',
                                 text: extraText,
                                 image: null,
@@ -848,7 +852,7 @@
                                 read: true,
                                 type: 'normal',
                             };
-                            messages.push(extraMsg);
+                            window.messages.push(extraMsg);
                             renderMessages();
                             await saveMessages();
                             sendNotification();
@@ -859,31 +863,31 @@
 
             // ---------- 主题切换 ----------
             function toggleTheme() {
-                isDark = !isDark;
-                document.documentElement.setAttribute('data-theme', isDark ? 'dark' : '');
-                themeToggle.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+                window.isDark = !window.isDark;
+                document.documentElement.setAttribute('data-theme', window.isDark ? 'dark' : '');
+                themeToggle.innerHTML = window.isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
                 saveMessages();
             }
             window.toggleTheme = toggleTheme;
 
             // ---------- 昵称修改 ----------
             function openNicknamePanel() {
-                document.getElementById('myNameInput').value = myName;
-                document.getElementById('partnerNameInput').value = partnerName;
+                document.getElementById('myNameInput').value = window.myName;
+                document.getElementById('partnerNameInput').value = window.partnerName;
                 document.getElementById('nicknamePanel').classList.add('open');
             }
 
             async function saveNickname() {
                 const newMy = document.getElementById('myNameInput').value.trim() || '我';
                 const newPartner = document.getElementById('partnerNameInput').value.trim() || '梦角';
-                if (newMy === myName && newPartner === partnerName) {
+                if (newMy === window.myName && newPartner === window.partnerName) {
                     showToast('昵称未改变', 'info');
                     return;
                 }
-                myName = newMy;
-                partnerName = newPartner;
+                window.myName = newMy;
+                window.partnerName = newPartner;
                 await saveMessages();
-                contactName.textContent = partnerName;
+                contactName.textContent = window.partnerName;
                 renderMessages();
                 document.getElementById('nicknamePanel').classList.remove('open');
                 showToast('昵称已更新', 'success');
@@ -893,18 +897,13 @@
             async function init() {
                 // 1. 初始化会话（设置 SESSION_ID）
                 await window.sessionManager.initializeSession();
-                SESSION_ID = window.sessionManager.getCurrentSessionId();
+                window.SESSION_ID = window.sessionManager.getCurrentSessionId();
                 sessionList = window.sessionManager.getSessionList();
 
                 // 2. 挂载全局存储键生成器
-                window.getSessionId = function() { return SESSION_ID; };
-                window.getPartnerName = function() { return partnerName; };
-                window.getMyName = function() { return myName; };
-                window.getStorageKey = getStorageKey;
-
-                // ★ 开放 setter 供备份面板等模块修改昵称
-                window.setPartnerName = function(name) { partnerName = name; };
-                window.setMyName = function(name) { myName = name; };
+                window.getSessionId = function() { return window.SESSION_ID; };
+                window.getPartnerName = function() { return window.partnerName; };
+                window.getMyName = function() { return window.myName; };
 
                 // 3. 加载各模块设置
                 if (window.frequencyManager) {
@@ -922,7 +921,7 @@
 
                 const hasData = await loadMessages();
                 if (!hasData) {
-                    messages = [];
+                    window.messages = [];
                     await saveMessages();
                 }
 
@@ -934,12 +933,12 @@
                     await window.emojiManager.reload();
                 }
 
-                if (isDark) {
+                if (window.isDark) {
                     document.documentElement.setAttribute('data-theme', 'dark');
                     themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
                 }
 
-                contactName.textContent = partnerName;
+                contactName.textContent = window.partnerName;
                 renderMessages();
 
                 if (window.cardManager && typeof window.cardManager.reload === 'function') {
@@ -1085,7 +1084,7 @@
                         const row = e.detail.row;
                         const msgId = row.dataset.msgId;
                         if (msgId) {
-                            const found = messages.find(m => m.id == msgId);
+                            const found = window.messages.find(m => m.id == msgId);
                             if (found) {
                                 window.quoteManager.showQuote(found);
                                 return;
@@ -1095,7 +1094,7 @@
                         if (!bubble) return;
                         const text = bubble.textContent.trim();
                         let found = null;
-                        for (let msg of messages) {
+                        for (let msg of window.messages) {
                             let msgText = msg.text || '';
                             if (msgText && msgText.length > 0 && text.includes(msgText.substring(0, 20))) {
                                 found = msg;
@@ -1114,10 +1113,10 @@
                 });
 
                 contactName.addEventListener('click', async function() {
-                    const newName = prompt('修改对方昵称：', partnerName);
+                    const newName = prompt('修改对方昵称：', window.partnerName);
                     if (newName !== null && newName.trim()) {
-                        partnerName = newName.trim();
-                        contactName.textContent = partnerName;
+                        window.partnerName = newName.trim();
+                        contactName.textContent = window.partnerName;
                         await saveMessages();
                         renderMessages();
                         showToast('昵称已更新', 'success');
@@ -1140,9 +1139,9 @@
                     const name = prompt('请输入新会话名称：', '我的会话');
                     if (name === null) return;
                     await window.sessionManager.createAndSwitch(name.trim() || '会话');
-                    SESSION_ID = window.sessionManager.getCurrentSessionId();
+                    window.SESSION_ID = window.sessionManager.getCurrentSessionId();
                     sessionList = window.sessionManager.getSessionList();
-                    messages = [];
+                    window.messages = [];
                     await saveMessages();
                     renderMessages();
                     document.getElementById('sessionPanel').classList.remove('open');
@@ -1150,9 +1149,9 @@
                 });
 
                 document.addEventListener('sessionChanged', async function(e) {
-                    SESSION_ID = e.detail.sessionId;
+                    window.SESSION_ID = e.detail.sessionId;
                     sessionList = window.sessionManager.getSessionList();
-                    window.getSessionId = function() { return SESSION_ID; };
+                    window.getSessionId = function() { return window.SESSION_ID; };
                     
                     if (window.frequencyManager) {
                         await window.frequencyManager.load();
@@ -1167,10 +1166,10 @@
 
                     const hasData = await loadMessages();
                     if (!hasData) {
-                        messages = [];
+                        window.messages = [];
                         await saveMessages();
                     }
-                    contactName.textContent = partnerName;
+                    contactName.textContent = window.partnerName;
                     renderMessages();
                     if (window.cardManager) window.cardManager.reload();
                     if (window.emojiManager) window.emojiManager.reload();
@@ -1209,7 +1208,7 @@
                 window.addEventListener('beforeunload', () => saveMessages());
 
                 msgInput.focus();
-                console.log('✅ 主程序启动完成,会话ID:', SESSION_ID);
+                console.log('✅ 主程序启动完成,会话ID:', window.SESSION_ID);
             }
 
             // ===== 频率面板渲染（修复版） =====
