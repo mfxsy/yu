@@ -635,7 +635,6 @@
             // ---------- 极简滚动到底部（防止抖动） ----------
             function scrollToBottom() {
                 if (!chatArea) return;
-                // 先更新 padding，防止消息被遮挡（但只在需要时调用）
                 // 立即滚动
                 chatArea.scrollTop = chatArea.scrollHeight;
                 // 下一帧再次确认（浏览器布局完成）
@@ -1162,52 +1161,49 @@ function markAllMyMessagesAsRead() {
                     });
                 }
 
-                // ✅ 动态更新底部留白（只在需要时调用）
+                // ✅ 动态更新底部留白（只记录底部工具栏高度计算）
                 function updateChatPadding() {
                     const inputBarHeight = inputBar.offsetHeight;
-                    chatArea.style.paddingBottom = (inputBarHeight + 20) + 'px';
+                    let bottomToolbarHeight = 0;
+                    if (window.visualViewport) {
+                        const diff = window.innerHeight - window.visualViewport.height;
+                        if (diff > 0) {
+                            bottomToolbarHeight = diff;
+                        }
+                    }
+                    const totalBottomPadding = inputBarHeight + bottomToolbarHeight + 20;
+                    chatArea.style.paddingBottom = totalBottomPadding + 'px';
                 }
                 updateChatPadding();
 
-                // ---------- 键盘与滚动事件优化（统一延迟 150ms） ----------
-                let resizeTimer = null;
+                // ---------- 键盘与滚动事件优化（无延迟，直接使用 requestAnimationFrame） ----------
                 let prevInnerHeight = window.innerHeight;
                 window.addEventListener('resize', function() {
-                    clearTimeout(resizeTimer);
                     if (window.innerHeight > prevInnerHeight) {
-                        resizeTimer = setTimeout(() => {
+                        requestAnimationFrame(() => {
                             updateChatPadding();
                             scrollToBottom();
-                        }, 150);
+                        });
                     }
                     prevInnerHeight = window.innerHeight;
                 });
 
                 // ✅ visualViewport 处理
                 if (window.visualViewport) {
-                    let viewportTimer = null;
                     let prevViewportHeight = window.visualViewport.height;
                     window.visualViewport.addEventListener('resize', function() {
-                        clearTimeout(viewportTimer);
                         const currentHeight = window.visualViewport.height;
                         if (currentHeight > prevViewportHeight) {
-                            viewportTimer = setTimeout(() => {
+                            requestAnimationFrame(() => {
                                 updateChatPadding();
                                 scrollToBottom();
-                            }, 150);
+                            });
                         }
                         prevViewportHeight = currentHeight;
                     });
                 }
 
-                // ✅ 输入框 blur 时滚动（键盘收起时触发）
-                msgInput.addEventListener('blur', function() {
-                    // 先让浏览器完成键盘动画，再更新布局和滚动
-                    setTimeout(() => {
-                        updateChatPadding();
-                        scrollToBottom();
-                    }, 150);
-                });
+                
 
                 // 挂载按钮事件
                 sendBtn.addEventListener('click', function() {
@@ -1216,8 +1212,7 @@ function markAllMyMessagesAsRead() {
                         window.sendMessage(text);
                         msgInput.value = '';
                         msgInput.style.height = 'auto';
-                        // ★★★ 发送后收起键盘 ★★★
-                        msgInput.blur();
+                       
                     }
                 });
 
@@ -1645,8 +1640,7 @@ function markAllMyMessagesAsRead() {
         window.addEventListener('pageshow', function(event) {
             // 判断页面是否是从 BFCache（往返缓存）中加载的
             if (event.persisted) {
-                // 延迟执行，确保 Safari 已经完全完成它自己的“恢复滚动条”动作
-                setTimeout(() => {
+                requestAnimationFrame(() => {
                     // 1. 先确保底部内边距计算正确（应对键盘/底部栏高度变化）
                     if (typeof updateChatPadding === 'function') {
                         updateChatPadding();
@@ -1655,11 +1649,10 @@ function markAllMyMessagesAsRead() {
                     // 2. 强制滚动到底部
                     if (typeof scrollToBottom === 'function') {
                         scrollToBottom();
-                        
-                        // 3. 再延迟一轮（150ms），防止聊天中的图片加载撑高了页面，导致滚动条又偏离底部
-                        setTimeout(scrollToBottom, 150);
+                        // 不需要额外的延迟，一个 rAF 即可保证当前帧的正确高度
+                        requestAnimationFrame(scrollToBottom);
                     }
-                }, 400); // 延迟 400ms 是经过测试的稳妥值，能完美覆盖浏览器的自动恢复
+                });
             }
         });
         })();
