@@ -863,11 +863,13 @@
                 await saveMessages();
 
                 setTimeout(async () => {
-                    msg.read = true;
-                    updateReadReceipt(msg.id);
-                    await saveMessages();
+                // 如果开启了“已读不回”，暂时不显示已读回执（等对方回复后再批量已读）
+                if (!noReplyEnabled) {
+                msg.read = true;
+                updateReadReceipt(msg.id);
+                await saveMessages();
+                }
                 }, 800 + Math.random() * 1200);
-
                 triggerReply(false);
                 return true;
             };
@@ -911,6 +913,38 @@
             };
 
             // ---------- 回复逻辑（不变） ----------
+
+            // ---------- 批量将我方未读消息标记为已读 ----------
+function markAllMyMessagesAsRead() {
+    let changed = false;
+    // 先把内存里的未读消息全部改成已读
+    window.messages.forEach(msg => {
+        if (msg.sender === 'me' && !msg.read) {
+            msg.read = true;
+            changed = true;
+        }
+    });
+    // 如果有未读消息变为了已读，则更新 DOM 中的图标
+    if (changed) {
+        const rows = chatArea.querySelectorAll('.msg-row.sent');
+        rows.forEach(row => {
+            const msgId = row.dataset.msgId;
+            if (msgId) {
+                const msg = window.messages.find(m => String(m.id) === String(msgId));
+                if (msg && msg.sender === 'me' && msg.read) {
+                    const statusEl = row.querySelector('.msg-meta .read-status');
+                    if (statusEl && !statusEl.classList.contains('read')) {
+                        statusEl.className = 'read-status read';
+                        statusEl.innerHTML = '<i class="fas fa-check-circle"></i>';
+                    }
+                }
+            }
+        });
+        // 保存最新数据
+        saveMessages();
+    }
+}
+
             function triggerReply(fromActive) {
                 if (isTyping) return;
 
@@ -1012,6 +1046,9 @@
                     await saveMessages();
                     sendNotification();
 
+                     // ✅ 在对方发送新消息后，把之前所有未读的我方消息全部标记为已读
+                    markAllMyMessagesAsRead();
+
                     if (Math.random() < 0.2 && textPool.length > 1) {
                         const extraText = textPool[Math.floor(Math.random() * textPool.length)];
                         if (extraText) {
@@ -1109,6 +1146,12 @@
                 contactName.textContent = window.partnerName;
                 renderMessages();
 
+                 // ★★★ 在这里插入以下代码 ★★★
+        if (window.callManager && typeof window.callManager.checkCallInterruption === 'function') {
+            await window.callManager.checkCallInterruption();
+        }
+        // ★★★ 插入结束 ★★★
+
                 if (window.cardManager && typeof window.cardManager.reload === 'function') {
                     await window.cardManager.reload();
                 }
@@ -1173,8 +1216,7 @@
                         window.sendMessage(text);
                         msgInput.value = '';
                         msgInput.style.height = 'auto';
-                        // ★★★ 发送后收起键盘 ★★★
-                        msgInput.blur();
+                       
                     }
                 });
 
@@ -1595,6 +1637,33 @@
                 }
             }
             delayedInit();
+
+                    delayedInit();
+
+        // ---------- 修复 Safari BFCache 页面恢复滚动位置 ----------
+        window.addEventListener('pageshow', function(event) {
+            // 判断页面是否是从 BFCache（往返缓存）中加载的
+            if (event.persisted) {
+                // 延迟执行，确保 Safari 已经完全完成它自己的“恢复滚动条”动作
+                setTimeout(() => {
+                    // 1. 先确保底部内边距计算正确（应对键盘/底部栏高度变化）
+                    if (typeof updateChatPadding === 'function') {
+                        updateChatPadding();
+                    }
+                    
+                    // 2. 强制滚动到底部
+                    if (typeof scrollToBottom === 'function') {
+                        scrollToBottom();
+                        
+                        // 3. 再延迟一轮（150ms），防止聊天中的图片加载撑高了页面，导致滚动条又偏离底部
+                        setTimeout(scrollToBottom, 150);
+                    }
+                }, 400); // 延迟 400ms 是经过测试的稳妥值，能完美覆盖浏览器的自动恢复
+            }
+        });
+        })();
+    </script> 
+
         })();
     </script>
 </body>
