@@ -245,55 +245,54 @@ body.with-background .chat-area {
     align-items: flex-start;
 }
 
-/* ===== 修改部分：气泡圆角与三角形（无缝隙） ===== */
+/* ===== 修复：气泡圆角与三角形无缝连接 ===== */
 .msg-bubble {
-    position: relative;          /* ★ 新增：为三角形提供绝对定位基准，彻底消除缝隙 */
     padding: 10px 14px;
-    border-radius: 4px;          /* 微信典型圆角 */
+    border-radius: 4px;
     font-size: 15px;
     line-height: 1.55;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    position: relative;
     max-width: 100%;
     transition: background 0.3s, color 0.3s;
 }
 .msg-row.sent .msg-bubble {
     background: var(--wechat-bubble-sent);
     color: var(--wechat-text-primary);
+    border-radius: 4px 0 4px 4px; /* 右上角直角 */
 }
 .msg-row.recv .msg-bubble {
     background: var(--wechat-bubble-recv);
     color: var(--wechat-text-primary);
+    border-radius: 0 4px 4px 4px; /* 左上角直角 */
 }
 
-/* ★ 修改：将三角形直接定位在气泡元素上，共享同一渲染层，消除背景图导致的1px缝隙 ★ */
 /* 发送气泡三角形（右侧） */
-.msg-row.sent .msg-bubble::after {
+.msg-row.sent .msg-bubble-wrap::after {
     content: '';
     position: absolute;
     top: 14px;
-    right: -6px;
-    border: 6px solid transparent;
+    right: -7px;
+    border: 7px solid transparent;
     border-left-color: var(--wechat-bubble-sent);
     border-right: 0;
-    z-index: 1;
 }
 
 /* 接收气泡三角形（左侧） */
-.msg-row.recv .msg-bubble::before {
+.msg-row.recv .msg-bubble-wrap::before {
     content: '';
     position: absolute;
     top: 14px;
-    left: -6px;
-    border: 6px solid transparent;
+    left: -7px;
+    border: 7px solid transparent;
     border-right-color: var(--wechat-bubble-recv);
     border-left: 0;
-    z-index: 1;
 }
 
-/* 图片气泡不显示三角形 */
-.msg-bubble.img-only::before,
-.msg-bubble.img-only::after {
+/* 图片气泡不显示三角形（保持原样） */
+.msg-bubble-wrap:has(.msg-bubble.img-only)::before,
+.msg-bubble-wrap:has(.msg-bubble.img-only)::after {
     display: none !important;
 }
 
