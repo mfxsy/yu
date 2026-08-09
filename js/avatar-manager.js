@@ -154,7 +154,7 @@
                     const file = e.target.files[0];
                     if (!file) return;
                     if (file.size > 2 * 1024 * 1024) {
-                        showToast('图片不能超过5MB', 'error');
+                        showToast('图片不能超过10MB', 'error');
                         return;
                     }
                     const reader = new FileReader();
@@ -197,7 +197,7 @@
                 const file = e.target.files[0];
                 if (!file) return;
                 if (file.size > 2 * 1024 * 1024) {
-                    showToast('图片不能超过5MB', 'error');
+                    showToast('图片不能超过10MB', 'error');
                     return;
                 }
                 const reader = new FileReader();

@@ -245,10 +245,10 @@ body.with-background .chat-area {
     align-items: flex-start;
 }
 
-/* ===== 修复：气泡圆角与三角形无缝连接 ===== */
+/* ===== 修改部分：气泡圆角与三角形（无缝隙） ===== */
 .msg-bubble {
     padding: 10px 14px;
-    border-radius: 4px;
+    border-radius: 4px;          /* 微信典型圆角 */
     font-size: 15px;
     line-height: 1.55;
     word-wrap: break-word;
@@ -260,32 +260,30 @@ body.with-background .chat-area {
 .msg-row.sent .msg-bubble {
     background: var(--wechat-bubble-sent);
     color: var(--wechat-text-primary);
-    border-radius: 4px 0 4px 4px; /* 右上角直角 */
 }
 .msg-row.recv .msg-bubble {
     background: var(--wechat-bubble-recv);
     color: var(--wechat-text-primary);
-    border-radius: 0 4px 4px 4px; /* 左上角直角 */
 }
 
-/* 发送气泡三角形（右侧） */
+/* 发送气泡三角形（右侧） —— 彻底消除缝隙 */
 .msg-row.sent .msg-bubble-wrap::after {
     content: '';
     position: absolute;
-    top: 14px;
-    right: -7px;
-    border: 7px solid transparent;
+    top: 14px;                  /* 与气泡内部顶部内边距对齐 */
+    right: -5px;                /* 等于border-width，紧贴边缘 */
+    border: 6px solid transparent;
     border-left-color: var(--wechat-bubble-sent);
     border-right: 0;
 }
 
-/* 接收气泡三角形（左侧） */
+/* 接收气泡三角形（左侧） —— 彻底消除缝隙 */
 .msg-row.recv .msg-bubble-wrap::before {
     content: '';
     position: absolute;
     top: 14px;
-    left: -7px;
-    border: 7px solid transparent;
+    left: -5px;
+    border: 6px solid transparent;
     border-right-color: var(--wechat-bubble-recv);
     border-left: 0;
 }
