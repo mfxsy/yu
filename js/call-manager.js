@@ -17,11 +17,12 @@
     let floatingWindow = null;
     let isFloating = false;
     let initiator = null;
-    let callStartTime = null;      // 改为存储开始时间（Date 对象）
+    let callStartTime = null;
     let callStatusEl = null;
 
-    // ★ 新增：存储未接来电的键
+    // ★ 存储键
     const MISSED_CALL_KEY = 'callManager_missedCall';
+    const CALL_INTERRUPT_KEY = 'callManager_interrupt'; // ★ 通话打断标记
 
     // ---------- 获取昵称 ----------
     function getPartnerName() {
@@ -38,13 +39,14 @@
     // ---------- 发送普通聊天消息 ----------
     function sendChatMessage(text, sender) {
         if (typeof window.addMessage === 'function') {
+            // 强制使用 'normal' 类型，保证以气泡形式呈现
             window.addMessage(text, sender, 'normal');
         } else {
             console.warn('addMessage not available');
         }
     }
 
-    // ---------- 格式化通话时长（基于秒数） ----------
+    // ---------- 格式化通话时长 ----------
     function formatDuration(seconds) {
         const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
         const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
@@ -52,13 +54,13 @@
         return `通话时长 ${h}:${m}:${s} ᯅ`;
     }
 
-    // ---------- 获取当前通话秒数（基于时间戳） ----------
+    // ---------- 获取当前通话秒数 ----------
     function getCurrentCallSeconds() {
         if (!callStartTime) return 0;
         return Math.floor((Date.now() - callStartTime.getTime()) / 1000);
     }
 
-    // ---------- 创建悬浮窗（不变） ----------
+    // ---------- 创建悬浮窗 ----------
     function createFloatingWindow() {
         if (floatingWindow) return;
         floatingWindow = document.createElement('div');
@@ -482,7 +484,10 @@
                 callStartTime = new Date();
                 renderCallScreen('inCall', { name: getPartnerName() });
                 if (isFloating) updateFloatingWindow('通话中', true);
+                // ★ 设置中断标记
+                localStorage.setItem(CALL_INTERRUPT_KEY, JSON.stringify({ timestamp: Date.now(), initiator: initiator }));
             } else {
+                // ★ 未接听依然由发起方发送消息，且为气泡
                 sendChatMessage('对方暂时无法接听ᯅ ', 'me');
                 endCall();
             }
@@ -495,7 +500,25 @@
             if (currentState === STATE.CALLING) {
                 sendChatMessage('已取消ᯅ', 'me');
             } else if (currentState === STATE.INCOMING) {
-                sendChatMessage('对方暂时无法接听ᯅ ', 'system'); // 改为 system 防止误触通知
+                // ★ 拒接来电：由拨打方（对方）发出消息，记录准确的来电开始时间
+                const callStart = window._callStartTime || new Date();
+                const msg = {
+                    id: ++window.lastMsgId,
+                    sender: 'partner', // 拨打方
+                    text: '对方暂时无法接听ᯅ ',
+                    image: null,
+                    time: new Date(callStart),
+                    read: true,
+                    type: 'normal'
+                };
+                window.messages.push(msg);
+                if (typeof window.appendMessageDOM === 'function') {
+                    window.appendMessageDOM(msg);
+                } else {
+                    window.renderMessages();
+                }
+                if (typeof window.saveMessages === 'function') window.saveMessages();
+                localforage.removeItem(MISSED_CALL_KEY);
             }
         }
         endCall();
@@ -503,13 +526,14 @@
 
     function handleIncomingAnswer() {
         if (currentState !== STATE.INCOMING) return;
-        // ★ 接听后必须清除未接记录
         localforage.removeItem(MISSED_CALL_KEY);
         currentState = STATE.IN_CALL;
         callStartTime = new Date();
         initiator = 'partner';
         renderCallScreen('inCall', { name: getPartnerName() });
         if (isFloating) updateFloatingWindow('通话中', true);
+        // ★ 设置中断标记（对方发起的通话被打断时，记录为 partner）
+        localStorage.setItem(CALL_INTERRUPT_KEY, JSON.stringify({ timestamp: Date.now(), initiator: initiator }));
     }
 
     function handleCallEndByMe() {
@@ -534,6 +558,8 @@
             incomingTimer = null;
         }
         startIncomingTimer();
+        // ★ 正常挂断时清除中断标记
+        localStorage.removeItem(CALL_INTERRUPT_KEY);
     }
 
     // ---------- 对方来电 ----------
@@ -557,55 +583,71 @@
         }, delay);
     }
 
-    // ★ 修改：新增时间戳持久化存储
     function triggerIncomingCall() {
         if (currentState !== STATE.IDLE) return;
         
-        // 记录进存储：精确的发起时间和未来的超时时间点
         const startTime = Date.now();
+        window._callStartTime = startTime; // 保存来电开始时间供实时拒接使用
+        initiator = 'partner';
+        
+        // ★ 存储时带上 initiator（拨打方），防止页面刷新后无法还原谁发起的
         localforage.setItem(MISSED_CALL_KEY, {
             startTime: startTime,
-            timeoutAt: startTime + 20000 // 20秒
+            timeoutAt: startTime + 20000,
+            initiator: initiator 
         });
 
         currentState = STATE.INCOMING;
-        initiator = 'partner';
         callStartTime = null;
         showOverlay();
         renderCallScreen('incoming', { name: getPartnerName() });
 
         setTimeout(() => {
             if (currentState === STATE.INCOMING) {
-                // ★ 未接，改为 system 发送者，避免触发通知
-                sendChatMessage('对方暂时无法接听ᯅ ', 'system');
+                // ★ 未接来电：由拨打方（partner）发出气泡消息，时间戳为真实开始时间
+                const msg = {
+                    id: ++window.lastMsgId,
+                    sender: initiator,
+                    text: '对方暂时无法接听ᯅ ',
+                    image: null,
+                    time: new Date(startTime), 
+                    read: true,
+                    type: 'normal'
+                };
+                window.messages.push(msg);
+                if (typeof window.appendMessageDOM === 'function') {
+                    window.appendMessageDOM(msg);
+                } else {
+                    window.renderMessages();
+                }
+                if (typeof window.saveMessages === 'function') window.saveMessages();
                 localforage.removeItem(MISSED_CALL_KEY);
                 endCall();
             }
         }, 20000);
     }
 
-    // ★ 新增：页面加载时检查是否有未接来电记录
     async function checkForMissedCall() {
         const missed = await localforage.getItem(MISSED_CALL_KEY);
         if (!missed) return;
 
         const now = Date.now();
 
-        if (now >= missed.timeoutAt) {
-            // 已超时，将历史未接来电推入消息列表
-            window.lastMsgId = (window.lastMsgId || 0) + 1;
+        // 适配旧版存储（未存 initiator 时默认是对方拨打）
+        const initiator = missed.initiator || 'partner';
+
+        const generateMissedMessage = async (timestamp) => {
+            // ★ 生成正常气泡消息 (type: 'normal')，发送方为拨打方
             const msg = {
-                id: window.lastMsgId,
-                sender: 'system',
-                text: '未接来电 ᯅ',
+                id: ++window.lastMsgId,
+                sender: initiator,
+                text: '对方暂时无法接听ᯅ',
                 image: null,
-                time: new Date(missed.startTime), // ✅ 修正为真实发起时间
+                time: new Date(timestamp),
                 read: true,
-                type: 'system'
+                type: 'normal' 
             };
             window.messages.push(msg);
-            
-            // 优先使用增量追加（防止闪烁），否则回退到重绘
             if (typeof window.appendMessageDOM === 'function') {
                 window.appendMessageDOM(msg);
             } else {
@@ -613,33 +655,51 @@
             }
             if (typeof window.saveMessages === 'function') window.saveMessages();
             await localforage.removeItem(MISSED_CALL_KEY);
+        };
+
+        if (now >= missed.timeoutAt) {
+            await generateMissedMessage(missed.startTime);
         } else {
-            // 如果在 20 秒内恰好打开了网页，就等剩下的时间再判定
             const remaining = missed.timeoutAt - now;
             setTimeout(async () => {
                 const stillMissed = await localforage.getItem(MISSED_CALL_KEY);
                 if (stillMissed) {
-                    // 重复上面的发送逻辑
-                    window.lastMsgId = (window.lastMsgId || 0) + 1;
-                    const msg = {
-                        id: window.lastMsgId,
-                        sender: 'system',
-                        text: '未接来电 ᯅ',
-                        image: null,
-                        time: new Date(stillMissed.startTime),
-                        read: true,
-                        type: 'system'
-                    };
-                    window.messages.push(msg);
-                    if (typeof window.appendMessageDOM === 'function') {
-                        window.appendMessageDOM(msg);
-                    } else {
-                        window.renderMessages();
-                    }
-                    if (typeof window.saveMessages === 'function') window.saveMessages();
-                    await localforage.removeItem(MISSED_CALL_KEY);
+                    await generateMissedMessage(stillMissed.startTime);
                 }
             }, remaining);
+        }
+    }
+
+    // ★ 核心修改：只生成气泡消息，删除任何系统消息逻辑
+    async function checkCallInterruption() {
+        const raw = localStorage.getItem(CALL_INTERRUPT_KEY);
+        if (!raw) return;
+        try {
+            const { timestamp, initiator: interruptInitiator } = JSON.parse(raw);
+            localStorage.removeItem(CALL_INTERRUPT_KEY); // 使用后立即清除
+
+            // ★ 只生成一条普通消息（气泡）
+            const msg = {
+                id: ++window.lastMsgId,
+                sender: interruptInitiator || 'me', 
+                text: '通话已中断 ᯅ', // 如需修改文本，可在此修改
+                image: null,
+                time: new Date(timestamp), 
+                read: true,
+                type: 'normal' // ★ 重点：必须是 'normal'，才能显示为气泡
+            };
+            
+            window.messages.push(msg);
+            
+            if (window.messages.length === 1) {
+                window.renderMessages();
+            } else {
+                window.appendMessageDOM(msg);
+            }
+            
+            await window.saveMessages();
+        } catch (e) {
+            console.warn('处理中断通话记录失败:', e);
         }
     }
 
@@ -655,11 +715,19 @@
 
         createFloatingWindow();
         startIncomingTimer();
-
-        // ★ 在页面启动时立即检查未接来电记录
         checkForMissedCall();
 
-        console.log('📞 通话功能已加载（带后台未接来电持久化记录修复）');
+        // ★ 增加刷新/关闭监听：记录打断状态
+        window.addEventListener('beforeunload', function() {
+            if (currentState === STATE.IN_CALL) {
+                localStorage.setItem(CALL_INTERRUPT_KEY, JSON.stringify({ 
+                    timestamp: Date.now(), 
+                    initiator: initiator 
+                }));
+            }
+        });
+
+        console.log('📞 通话功能已加载（修复：只保留气泡消息，删除系统药丸）');
     }
 
     if (document.readyState === 'loading') {
@@ -668,8 +736,10 @@
         init();
     }
 
+    // 暴露接口
     window.callManager = {
         endCall: endCall,
-        getState: () => currentState
+        getState: () => currentState,
+        checkCallInterruption: checkCallInterruption 
     };
 })();

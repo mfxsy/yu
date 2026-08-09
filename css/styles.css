@@ -23,6 +23,7 @@
     --safe-bottom: env(safe-area-inset-bottom, 0px);
     --chat-bg-image: none;
     --avatar-size: 50px;
+    --triangle-offset: 8px;   /* 保留但已不再使用，由固定值替代 */
     --nav-height: calc(52px + var(--safe-top));
 }
 [data-theme="dark"] {
@@ -53,8 +54,8 @@ body {
     flex-direction: column;
     height: 100vh;
     height: 100dvh;
-    overflow: hidden;
-    padding-top: 0;
+    overflow: hidden;               /* 禁止页面整体滚动 */
+    padding-top: 0;                 /* 删除之前预留顶部空间的操作 */
     background: var(--wechat-bg);
     color: var(--wechat-text-primary);
     margin: 0;
@@ -150,19 +151,21 @@ body.with-background .chat-area {
     flex: 1;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: hidden;  /* 防止溢出 */
     min-height: 0;
 }
 
 /* ===== 聊天区域 ===== */
+
 .chat-area {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     padding: 12px 16px 8px;
-    padding-top: calc(var(--nav-height) + 8px);
-    /* 底部 padding 将会由 JS 动态控制 */
+    /* 重点：顶部留出导航栏高度，底部留出固定输入框高度 */
+    padding-top: calc(var(--nav-height) + 8px);      /* 防止消息被顶部栏盖住 */
+    padding-bottom: calc(80px + var(--safe-bottom)); /* 防止消息被底部栏盖住 */
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -242,10 +245,10 @@ body.with-background .chat-area {
     align-items: flex-start;
 }
 
-/* ===== 气泡圆角与三角形 ===== */
+/* ===== 修改部分：气泡圆角与三角形（无缝隙） ===== */
 .msg-bubble {
     padding: 10px 14px;
-    border-radius: 4px;
+    border-radius: 4px;          /* 微信典型圆角 */
     font-size: 15px;
     line-height: 1.55;
     word-wrap: break-word;
@@ -263,15 +266,18 @@ body.with-background .chat-area {
     color: var(--wechat-text-primary);
 }
 
+/* 发送气泡三角形（右侧） —— 彻底消除缝隙 */
 .msg-row.sent .msg-bubble-wrap::after {
     content: '';
     position: absolute;
-    top: 14px;
-    right: -4px;
+    top: 14px;                  /* 与气泡内部顶部内边距对齐 */
+    right: -4px;                /* 等于border-width，紧贴边缘 */
     border: 6px solid transparent;
     border-left-color: var(--wechat-bubble-sent);
     border-right: 0;
 }
+
+/* 接收气泡三角形（左侧） —— 彻底消除缝隙 */
 .msg-row.recv .msg-bubble-wrap::before {
     content: '';
     position: absolute;
@@ -281,6 +287,8 @@ body.with-background .chat-area {
     border-right-color: var(--wechat-bubble-recv);
     border-left: 0;
 }
+
+/* 图片气泡不显示三角形（保持原样） */
 .msg-bubble-wrap:has(.msg-bubble.img-only)::before,
 .msg-bubble-wrap:has(.msg-bubble.img-only)::after {
     display: none !important;
@@ -347,13 +355,13 @@ body.with-background .chat-area {
     background: rgba(255, 255, 255, 0.06);
 }
 
-/* ===== 底部输入栏（核心修改：保留fixed，加入平滑过渡） ===== */
+/* ===== 底部输入栏（不固定，作为 flex 子项） ===== */
 .wechat-input-bar {
-    position: fixed;
+    position: fixed;         /* 改固定定位，脱离文档流 */
     bottom: 0;
     left: 0;
     right: 0;
-    z-index: 100;
+    z-index: 100;            /* 层级保证在消息之上 */
     display: flex;
     align-items: flex-end;
     gap: 6px;
@@ -361,9 +369,9 @@ body.with-background .chat-area {
     background: var(--wechat-nav-bg);
     border-top: 0.5px solid var(--wechat-border);
     box-sizing: border-box;
-    /* ★ 核心：加入平移过渡，消除顿挫感 ★ */
-    transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
+
+    
 
 .wechat-input-bar .input-wrap {
     flex: 1;
@@ -926,7 +934,7 @@ body.with-background .chat-area {
     }
 }
 
-/* ===== 表情包标签切换 ===== */
+/* ===== 表情包标签切换（与字卡一致） ===== */
 .emoji-tab-btn {
     flex: 1;
     padding: 8px 0;
@@ -953,7 +961,8 @@ body.with-background .empty-state {
     height: 80vh;
     max-height: 80vh;
 }
+
 /* ===== 表情包面板 - 固定最大高度 ===== */
 #emojiPanel .panel-sheet {
-    max-height: 60vh !important;
+    max-height: 60vh !important;  /* 优先覆盖全局的 max-height: 82vh */
 }

@@ -49,8 +49,6 @@
             left: 0;
             right: 0;
             z-index: 100;
-            /* ★ 核心：平滑的 translateY 过渡，消除跳跃 ★ */
-            transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
         }
     </style>
 </head>
@@ -414,16 +412,30 @@
     <div class="toast" id="toast"></div>
 
     <!-- ===== 脚本加载 ===== -->
-    <script src="./js/session-manager.js"></script>
-    <script src="./js/card-manager.js"></script>
-    <script src="./js/emoji-manager.js"></script>
-    <script src="./js/avatar-manager.js"></script>
-    <script src="./js/quote-manager.js"></script>
-    <script src="./js/frequency-manager.js"></script>
-    <script src="./js/call-manager.js"></script>
-    <script src="./js/backup-panel.js"></script>
+    <script src="./js/session-manager.js">
+    </script>
+    <script src="./js/card-manager.js">
+    </script>
+    <script src="./js/emoji-manager.js">
+    </script>
+    <script src="./js/avatar-manager.js">
+    </script>
+    <script src="./js/quote-manager.js">
+    </script>
+    <script src="./js/frequency-manager.js">
+    </script>
+    <script src="./js/call-manager.js">
+    </script>
+    <script src="./js/backup-panel.js">
+    </script>
 
-    <!-- ===== 主程序（重新稳定布局，消除底部跳跃） ===== -->
+    <!-- =============================================================
+    主程序（稳定版：解决输入栏弹跳）
+    优化点：
+    1. 键盘收起时先让浏览器完成布局，再更新 padding 和滚动
+    2. 滚动函数精简，减少触发次数
+    3. 统一延迟 150ms，避免与键盘动画冲突
+    ============================================================= -->
     <script>
         (function() {
             'use strict';
@@ -473,7 +485,8 @@
                 if (!(date instanceof Date)) date = new Date(date);
                 if (isNaN(date.getTime())) return '1970-01-01';
                 const d = date;
-                return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2,
+                    '0');
             }
 
             function showToast(text, type, duration) {
@@ -619,32 +632,16 @@
             }
             window.saveMessages = saveMessages;
 
-            // ---------- 滚动到底部（彻底去掉防抖） ----------
+            // ---------- 极简滚动到底部（防止抖动） ----------
             function scrollToBottom() {
                 if (!chatArea) return;
+                // 先更新 padding，防止消息被遮挡（但只在需要时调用）
+                // 立即滚动
+                chatArea.scrollTop = chatArea.scrollHeight;
+                // 下一帧再次确认（浏览器布局完成）
                 requestAnimationFrame(() => {
                     chatArea.scrollTop = chatArea.scrollHeight;
                 });
-            }
-
-            // ---------- 动态更新底部内边距与输入栏偏移（核心修复） ----------
-            function updateChatPadding() {
-                const inputBarHeight = inputBar.offsetHeight;
-                let bottomToolbarHeight = 0;
-                
-                if (window.visualViewport) {
-                    // 计算底部工具栏（如 Safari 的前进后退栏）露出时的高度
-                    const diff = window.innerHeight - window.visualViewport.height;
-                    // 差值在 0~100px 之间时，就是键盘收起后底部工具栏瞬间露出的高度
-                    if (diff > 0 && diff < 100) {
-                        bottomToolbarHeight = diff;
-                    }
-                }
-                
-                // 抵消底部工具条：用 translateY 让输入栏“往上挪”，完全盖住工具条
-                inputBar.style.transform = bottomToolbarHeight > 0 ? `translateY(-${bottomToolbarHeight}px)` : '';
-                // 聊天区同步增加对应的内边距，防止最后一条消息被输入栏挡住
-                chatArea.style.paddingBottom = (inputBarHeight + bottomToolbarHeight + 20) + 'px';
             }
 
             // ---------- 渲染消息（全量构建） ----------
@@ -860,15 +857,18 @@
                     appendMessageDOM(msg);
                 }
 
+                // 发送后滚动（只一次）
                 scrollToBottom();
+
                 await saveMessages();
 
                 setTimeout(async () => {
-                    if (!noReplyEnabled) {
-                        msg.read = true;
-                        updateReadReceipt(msg.id);
-                        await saveMessages();
-                    }
+                // 如果开启了“已读不回”，暂时不显示已读回执（等对方回复后再批量已读）
+                if (!noReplyEnabled) {
+                msg.read = true;
+                updateReadReceipt(msg.id);
+                await saveMessages();
+                }
                 }, 800 + Math.random() * 1200);
                 triggerReply(false);
                 return true;
@@ -912,33 +912,38 @@
                 }
             };
 
-            // ---------- 回复逻辑 ----------
-            function markAllMyMessagesAsRead() {
-                let changed = false;
-                window.messages.forEach(msg => {
-                    if (msg.sender === 'me' && !msg.read) {
-                        msg.read = true;
-                        changed = true;
+            // ---------- 回复逻辑（不变） ----------
+
+            // ---------- 批量将我方未读消息标记为已读 ----------
+function markAllMyMessagesAsRead() {
+    let changed = false;
+    // 先把内存里的未读消息全部改成已读
+    window.messages.forEach(msg => {
+        if (msg.sender === 'me' && !msg.read) {
+            msg.read = true;
+            changed = true;
+        }
+    });
+    // 如果有未读消息变为了已读，则更新 DOM 中的图标
+    if (changed) {
+        const rows = chatArea.querySelectorAll('.msg-row.sent');
+        rows.forEach(row => {
+            const msgId = row.dataset.msgId;
+            if (msgId) {
+                const msg = window.messages.find(m => String(m.id) === String(msgId));
+                if (msg && msg.sender === 'me' && msg.read) {
+                    const statusEl = row.querySelector('.msg-meta .read-status');
+                    if (statusEl && !statusEl.classList.contains('read')) {
+                        statusEl.className = 'read-status read';
+                        statusEl.innerHTML = '<i class="fas fa-check-circle"></i>';
                     }
-                });
-                if (changed) {
-                    const rows = chatArea.querySelectorAll('.msg-row.sent');
-                    rows.forEach(row => {
-                        const msgId = row.dataset.msgId;
-                        if (msgId) {
-                            const msg = window.messages.find(m => String(m.id) === String(msgId));
-                            if (msg && msg.sender === 'me' && msg.read) {
-                                const statusEl = row.querySelector('.msg-meta .read-status');
-                                if (statusEl && !statusEl.classList.contains('read')) {
-                                    statusEl.className = 'read-status read';
-                                    statusEl.innerHTML = '<i class="fas fa-check-circle"></i>';
-                                }
-                            }
-                        }
-                    });
-                    saveMessages();
                 }
             }
+        });
+        // 保存最新数据
+        saveMessages();
+    }
+}
 
             function triggerReply(fromActive) {
                 if (isTyping) return;
@@ -1041,6 +1046,7 @@
                     await saveMessages();
                     sendNotification();
 
+                     // ✅ 在对方发送新消息后，把之前所有未读的我方消息全部标记为已读
                     markAllMyMessagesAsRead();
 
                     if (Math.random() < 0.2 && textPool.length > 1) {
@@ -1140,9 +1146,11 @@
                 contactName.textContent = window.partnerName;
                 renderMessages();
 
-                if (window.callManager && typeof window.callManager.checkCallInterruption === 'function') {
-                    await window.callManager.checkCallInterruption();
-                }
+                 // ★★★ 在这里插入以下代码 ★★★
+        if (window.callManager && typeof window.callManager.checkCallInterruption === 'function') {
+            await window.callManager.checkCallInterruption();
+        }
+        // ★★★ 插入结束 ★★★
 
                 if (window.cardManager && typeof window.cardManager.reload === 'function') {
                     await window.cardManager.reload();
@@ -1154,23 +1162,52 @@
                     });
                 }
 
-                // ✅ 初始执行
+                // ✅ 动态更新底部留白（只在需要时调用）
+                function updateChatPadding() {
+                    const inputBarHeight = inputBar.offsetHeight;
+                    chatArea.style.paddingBottom = (inputBarHeight + 20) + 'px';
+                }
                 updateChatPadding();
 
-                // ✅ 移除所有 setTimeout，完美消除键盘收回与底部工具栏的跳跃
+                // ---------- 键盘与滚动事件优化（统一延迟 150ms） ----------
+                let resizeTimer = null;
+                let prevInnerHeight = window.innerHeight;
                 window.addEventListener('resize', function() {
-                    updateChatPadding();
-                    scrollToBottom();
-                });
-
-                if (window.visualViewport) {
-                    window.visualViewport.addEventListener('resize', function() {
-                        requestAnimationFrame(() => {
+                    clearTimeout(resizeTimer);
+                    if (window.innerHeight > prevInnerHeight) {
+                        resizeTimer = setTimeout(() => {
                             updateChatPadding();
                             scrollToBottom();
-                        });
+                        }, 150);
+                    }
+                    prevInnerHeight = window.innerHeight;
+                });
+
+                // ✅ visualViewport 处理
+                if (window.visualViewport) {
+                    let viewportTimer = null;
+                    let prevViewportHeight = window.visualViewport.height;
+                    window.visualViewport.addEventListener('resize', function() {
+                        clearTimeout(viewportTimer);
+                        const currentHeight = window.visualViewport.height;
+                        if (currentHeight > prevViewportHeight) {
+                            viewportTimer = setTimeout(() => {
+                                updateChatPadding();
+                                scrollToBottom();
+                            }, 150);
+                        }
+                        prevViewportHeight = currentHeight;
                     });
                 }
+
+                // ✅ 输入框 blur 时滚动（键盘收起时触发）
+                msgInput.addEventListener('blur', function() {
+                    // 先让浏览器完成键盘动画，再更新布局和滚动
+                    setTimeout(() => {
+                        updateChatPadding();
+                        scrollToBottom();
+                    }, 150);
+                });
 
                 // 挂载按钮事件
                 sendBtn.addEventListener('click', function() {
@@ -1179,6 +1216,8 @@
                         window.sendMessage(text);
                         msgInput.value = '';
                         msgInput.style.height = 'auto';
+                        // ★★★ 发送后收起键盘 ★★★
+                        msgInput.blur();
                     }
                 });
 
@@ -1431,6 +1470,7 @@
 
                 msgInput.focus();
                 console.log('✅ 主程序启动完成,会话ID:', window.SESSION_ID);
+
             }
 
             // ===== 频率面板渲染（保持不变） =====
@@ -1599,20 +1639,32 @@
             }
             delayedInit();
 
-            // ---------- 修复 Safari BFCache 页面恢复滚动位置 ----------
-            window.addEventListener('pageshow', function(event) {
-                if (event.persisted) {
-                    setTimeout(() => {
-                        if (typeof updateChatPadding === 'function') {
-                            updateChatPadding();
-                        }
-                        if (typeof scrollToBottom === 'function') {
-                            scrollToBottom();
-                            setTimeout(scrollToBottom, 150);
-                        }
-                    }, 400);
-                }
-            });
+                    delayedInit();
+
+        // ---------- 修复 Safari BFCache 页面恢复滚动位置 ----------
+        window.addEventListener('pageshow', function(event) {
+            // 判断页面是否是从 BFCache（往返缓存）中加载的
+            if (event.persisted) {
+                // 延迟执行，确保 Safari 已经完全完成它自己的“恢复滚动条”动作
+                setTimeout(() => {
+                    // 1. 先确保底部内边距计算正确（应对键盘/底部栏高度变化）
+                    if (typeof updateChatPadding === 'function') {
+                        updateChatPadding();
+                    }
+                    
+                    // 2. 强制滚动到底部
+                    if (typeof scrollToBottom === 'function') {
+                        scrollToBottom();
+                        
+                        // 3. 再延迟一轮（150ms），防止聊天中的图片加载撑高了页面，导致滚动条又偏离底部
+                        setTimeout(scrollToBottom, 150);
+                    }
+                }, 400); // 延迟 400ms 是经过测试的稳妥值，能完美覆盖浏览器的自动恢复
+            }
+        });
+        })();
+    </script> 
+
         })();
     </script>
 </body>
