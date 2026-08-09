@@ -23,11 +23,9 @@
                 return;
             }
         } catch (e) {
-            // 若 getKey 失败（如 SESSION_ID 未定义），不要清空数据，直接返回
             console.warn('加载表情数据失败，SESSION_ID 可能未就绪:', e);
             return;
         }
-        // 如果数据不存在，初始化为空数组（仅在首次使用时）
         if (myEmojis.length === 0 && partnerEmojis.length === 0) {
             myEmojis = [];
             partnerEmojis = [];
@@ -74,59 +72,12 @@
         const title = currentTab === 'my' ? '我方表情' : '对方表情';
 
         container.innerHTML = '';
-        if (emojis.length === 0) {
-            container.innerHTML = `
-                <div class="card-empty">
-                    <i class="fas fa-image"></i>
-                    <p>${title} 暂无表情</p>
-                    <p style="font-size:12px;margin-top:4px;">点击下方按钮添加（可多选）</p>
-                </div>
-            `;
-        } else {
-            const grid = document.createElement('div');
-            grid.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:10px;';
-            emojis.forEach((src, idx) => {
-                const item = document.createElement('div');
-                item.style.cssText = 'aspect-ratio:1;border-radius:8px;border:1px solid var(--wechat-border);overflow:hidden;cursor:pointer;position:relative;background:var(--wechat-bubble-recv);';
-                item.innerHTML = `
-                    <img src="${src}" style="width:100%;height:100%;object-fit:cover;display:block;" />
-                    <button class="emoji-del-btn" data-tab="${currentTab}" data-idx="${idx}" style="position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;border:none;background:rgba(0,0,0,0.6);color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.7;transition:opacity 0.2s;">✕</button>
-                `;
-                item.querySelector('.emoji-del-btn').addEventListener('click', async function(e) {
-                    e.stopPropagation();
-                    const idx = parseInt(this.dataset.idx);
-                    const tab = this.dataset.tab;
-                    let success = false;
-                    if (tab === 'my') {
-                        success = await window.emojiManager.removeMyEmoji(idx);
-                    } else {
-                        success = await window.emojiManager.removePartnerEmoji(idx);
-                    }
-                    if (success) {
-                        renderPanel();
-                        showToast('已删除', 'success');
-                    }
-                });
-                item.addEventListener('click', async function(e) {
-                    if (e.target.closest('.emoji-del-btn')) return;
-                    if (currentTab === 'my') {
-                        try {
-                            await window.emojiManager.sendEmoji(src, true);
-                        } finally {
-                            document.getElementById('emojiPanel').classList.remove('open');
-                        }
-                    } else {
-                        showToast('对方表情不可手动发送', 'info');
-                    }
-                });
-                grid.appendChild(item);
-            });
-            container.appendChild(grid);
-        }
 
-        const btnContainer = document.createElement('div');
-        btnContainer.style.cssText = 'display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;';
+        // ===== 顶部按钮区域（移到最上方） =====
+        const topBtnContainer = document.createElement('div');
+        topBtnContainer.style.cssText = 'display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;';
 
+        // 添加表情按钮（双方通用）
         const addBtn = document.createElement('button');
         addBtn.textContent = '添加表情（可多选）';
         addBtn.style.cssText = 'flex:1;padding:10px;background:var(--wechat-green);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;';
@@ -187,8 +138,9 @@
             };
             input.click();
         });
-        btnContainer.appendChild(addBtn);
+        topBtnContainer.appendChild(addBtn);
 
+        // 只有“我方”标签页显示“发送图片”按钮
         if (currentTab === 'my') {
             const sendBtn = document.createElement('button');
             sendBtn.textContent = '发送图片';
@@ -211,6 +163,9 @@
                         if (typeof window.sendMessage === 'function') {
                             window.sendMessage('', dataUrl);
                             showToast('图片已发送', 'success');
+                            // 发送后自动关闭面板
+                            const panel = document.getElementById('emojiPanel');
+                            if (panel) panel.classList.remove('open');
                         } else {
                             showToast('发送失败', 'error');
                         }
@@ -219,10 +174,62 @@
                 };
                 input.click();
             });
-            btnContainer.appendChild(sendBtn);
+            topBtnContainer.appendChild(sendBtn);
         }
 
-        container.appendChild(btnContainer);
+        container.appendChild(topBtnContainer);
+
+        // ===== 内容区域（网格或空状态） =====
+        if (emojis.length === 0) {
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'card-empty';
+            emptyDiv.innerHTML = `
+                <i class="fas fa-image"></i>
+                <p>${title} 暂无表情</p>
+                <p style="font-size:12px;margin-top:4px;">点击下方按钮添加（可多选）</p>
+            `;
+            container.appendChild(emptyDiv);
+        } else {
+            const grid = document.createElement('div');
+            grid.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:10px;';
+            emojis.forEach((src, idx) => {
+                const item = document.createElement('div');
+                item.style.cssText = 'aspect-ratio:1;border-radius:8px;border:1px solid var(--wechat-border);overflow:hidden;cursor:pointer;position:relative;background:var(--wechat-bubble-recv);';
+                item.innerHTML = `
+                    <img src="${src}" style="width:100%;height:100%;object-fit:cover;display:block;" />
+                    <button class="emoji-del-btn" data-tab="${currentTab}" data-idx="${idx}" style="position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;border:none;background:rgba(0,0,0,0.6);color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0.7;transition:opacity 0.2s;">✕</button>
+                `;
+                item.querySelector('.emoji-del-btn').addEventListener('click', async function(e) {
+                    e.stopPropagation();
+                    const idx = parseInt(this.dataset.idx);
+                    const tab = this.dataset.tab;
+                    let success = false;
+                    if (tab === 'my') {
+                        success = await window.emojiManager.removeMyEmoji(idx);
+                    } else {
+                        success = await window.emojiManager.removePartnerEmoji(idx);
+                    }
+                    if (success) {
+                        renderPanel();
+                        showToast('已删除', 'success');
+                    }
+                });
+                item.addEventListener('click', async function(e) {
+                    if (e.target.closest('.emoji-del-btn')) return;
+                    if (currentTab === 'my') {
+                        try {
+                            await window.emojiManager.sendEmoji(src, true);
+                        } finally {
+                            document.getElementById('emojiPanel').classList.remove('open');
+                        }
+                    } else {
+                        showToast('对方表情不可手动发送', 'info');
+                    }
+                });
+                grid.appendChild(item);
+            });
+            container.appendChild(grid);
+        }
     }
 
     function showToast(msg, type) {
@@ -351,8 +358,6 @@
             });
         }
 
-        // 不再自动加载，改为由主程序在 SESSION_ID 就绪后调用 reload
-        // 但为了兼容，加载一次（若 SESSION_ID 未就绪则静默失败）
         loadData().then(function() {
             if (panel && panel.classList.contains('open')) {
                 renderPanel();

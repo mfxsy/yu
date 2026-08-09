@@ -20,6 +20,9 @@
     let callStartTime = null;      // 改为存储开始时间（Date 对象）
     let callStatusEl = null;
 
+    // ★ 新增：存储未接来电的键
+    const MISSED_CALL_KEY = 'callManager_missedCall';
+
     // ---------- 获取昵称 ----------
     function getPartnerName() {
         return document.getElementById('contactName')?.textContent || '梦角';
@@ -133,7 +136,7 @@
         floatingWindow.appendChild(hangupBtn);
         document.body.appendChild(floatingWindow);
 
-        // 拖动逻辑（同原代码，省略）
+        // 拖动逻辑
         let isDragging = false;
         let startX, startY, startLeft, startTop;
 
@@ -227,7 +230,6 @@
         }
     }
 
-    // ===== 修改：悬浮窗计时基于时间戳 =====
     function updateFloatingTimer() {
         if (!isFloating || currentState !== STATE.IN_CALL) return;
         const statusEl = document.getElementById('floatingStatus');
@@ -300,7 +302,7 @@
         }
     }
 
-    // ---------- 按钮创建（微信风格） ----------
+    // ---------- 按钮创建 ----------
     function createButton(iconClass, bgColor, onClick) {
         const btn = document.createElement('button');
         btn.innerHTML = `<i class="fas ${iconClass}"></i>`;
@@ -327,12 +329,11 @@
         return btn;
     }
 
-    // ---------- 渲染通话界面（计时部分使用时间戳） ----------
+    // ---------- 渲染通话界面 ----------
     function renderCallScreen(type, data) {
         const ov = createOverlay();
         ov.innerHTML = '';
 
-        // 顶部缩小按钮
         const shrinkBtn = document.createElement('div');
         shrinkBtn.style.cssText = `
             align-self: flex-end;
@@ -354,7 +355,6 @@
         shrinkBtn.appendChild(bar);
         ov.appendChild(shrinkBtn);
 
-        // 中间部分
         const center = document.createElement('div');
         center.style.cssText = `
             flex:1;
@@ -400,7 +400,6 @@
         center.appendChild(name);
         center.appendChild(status);
 
-        // 底部按钮
         const bottom = document.createElement('div');
         bottom.style.cssText = `
             width:100%;
@@ -423,15 +422,14 @@
             bottom.appendChild(rejectBtn);
             bottom.appendChild(answerBtn);
         } else if (type === 'inCall') {
-            // 初始显示 "00:00"，之后由计时器更新
             status.textContent = '00:00';
             const hangupBtn = createButton('fa-phone-slash', '#fa5151', handleCallEndByMe);
             bottom.appendChild(hangupBtn);
             callStatusEl = status;
             if (!data?.preserveTimer) {
-                startCallTimer();      // 新通话，启动计时
+                startCallTimer();
             } else {
-                updateCallStatusDisplay(); // 恢复时立即刷新显示
+                updateCallStatusDisplay();
             }
         }
 
@@ -439,15 +437,11 @@
         ov.appendChild(bottom);
     }
 
-    // ===== 修改：计时器逻辑基于时间戳 =====
     function startCallTimer() {
         stopCallTimer();
-        // 记录开始时间（通话接通的时刻）
         callStartTime = new Date();
-        // 立即更新一次显示
         updateCallStatusDisplay();
         updateFloatingTimer();
-        // 每隔 1 秒刷新显示（只负责刷新，不累加）
         callTimer = setInterval(() => {
             updateCallStatusDisplay();
             updateFloatingTimer();
@@ -485,7 +479,6 @@
             const answered = Math.random() < 0.5;
             if (answered) {
                 currentState = STATE.IN_CALL;
-                // 通话接通，记录开始时间
                 callStartTime = new Date();
                 renderCallScreen('inCall', { name: getPartnerName() });
                 if (isFloating) updateFloatingWindow('通话中', true);
@@ -502,7 +495,7 @@
             if (currentState === STATE.CALLING) {
                 sendChatMessage('已取消ᯅ', 'me');
             } else if (currentState === STATE.INCOMING) {
-                sendChatMessage('对方暂时无法接听ᯅ ', 'partner');
+                sendChatMessage('对方暂时无法接听ᯅ ', 'system'); // 改为 system 防止误触通知
             }
         }
         endCall();
@@ -510,8 +503,9 @@
 
     function handleIncomingAnswer() {
         if (currentState !== STATE.INCOMING) return;
+        // ★ 接听后必须清除未接记录
+        localforage.removeItem(MISSED_CALL_KEY);
         currentState = STATE.IN_CALL;
-        // 接听时记录开始时间
         callStartTime = new Date();
         initiator = 'partner';
         renderCallScreen('inCall', { name: getPartnerName() });
@@ -563,8 +557,17 @@
         }, delay);
     }
 
+    // ★ 修改：新增时间戳持久化存储
     function triggerIncomingCall() {
         if (currentState !== STATE.IDLE) return;
+        
+        // 记录进存储：精确的发起时间和未来的超时时间点
+        const startTime = Date.now();
+        localforage.setItem(MISSED_CALL_KEY, {
+            startTime: startTime,
+            timeoutAt: startTime + 20000 // 20秒
+        });
+
         currentState = STATE.INCOMING;
         initiator = 'partner';
         callStartTime = null;
@@ -573,10 +576,71 @@
 
         setTimeout(() => {
             if (currentState === STATE.INCOMING) {
-                sendChatMessage('对方暂时无法接听ᯅ ', 'partner');
+                // ★ 未接，改为 system 发送者，避免触发通知
+                sendChatMessage('对方暂时无法接听ᯅ ', 'system');
+                localforage.removeItem(MISSED_CALL_KEY);
                 endCall();
             }
         }, 20000);
+    }
+
+    // ★ 新增：页面加载时检查是否有未接来电记录
+    async function checkForMissedCall() {
+        const missed = await localforage.getItem(MISSED_CALL_KEY);
+        if (!missed) return;
+
+        const now = Date.now();
+
+        if (now >= missed.timeoutAt) {
+            // 已超时，将历史未接来电推入消息列表
+            window.lastMsgId = (window.lastMsgId || 0) + 1;
+            const msg = {
+                id: window.lastMsgId,
+                sender: 'system',
+                text: '未接来电 ᯅ',
+                image: null,
+                time: new Date(missed.startTime), // ✅ 修正为真实发起时间
+                read: true,
+                type: 'system'
+            };
+            window.messages.push(msg);
+            
+            // 优先使用增量追加（防止闪烁），否则回退到重绘
+            if (typeof window.appendMessageDOM === 'function') {
+                window.appendMessageDOM(msg);
+            } else {
+                window.renderMessages();
+            }
+            if (typeof window.saveMessages === 'function') window.saveMessages();
+            await localforage.removeItem(MISSED_CALL_KEY);
+        } else {
+            // 如果在 20 秒内恰好打开了网页，就等剩下的时间再判定
+            const remaining = missed.timeoutAt - now;
+            setTimeout(async () => {
+                const stillMissed = await localforage.getItem(MISSED_CALL_KEY);
+                if (stillMissed) {
+                    // 重复上面的发送逻辑
+                    window.lastMsgId = (window.lastMsgId || 0) + 1;
+                    const msg = {
+                        id: window.lastMsgId,
+                        sender: 'system',
+                        text: '未接来电 ᯅ',
+                        image: null,
+                        time: new Date(stillMissed.startTime),
+                        read: true,
+                        type: 'system'
+                    };
+                    window.messages.push(msg);
+                    if (typeof window.appendMessageDOM === 'function') {
+                        window.appendMessageDOM(msg);
+                    } else {
+                        window.renderMessages();
+                    }
+                    if (typeof window.saveMessages === 'function') window.saveMessages();
+                    await localforage.removeItem(MISSED_CALL_KEY);
+                }
+            }, remaining);
+        }
     }
 
     // ---------- 初始化 ----------
@@ -591,7 +655,11 @@
 
         createFloatingWindow();
         startIncomingTimer();
-        console.log('📞 通话功能已加载（按钮风格微信化，计时基于时间戳修复）');
+
+        // ★ 在页面启动时立即检查未接来电记录
+        checkForMissedCall();
+
+        console.log('📞 通话功能已加载（带后台未接来电持久化记录修复）');
     }
 
     if (document.readyState === 'loading') {

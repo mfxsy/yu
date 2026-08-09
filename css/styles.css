@@ -48,13 +48,17 @@ html, body {
     color: var(--wechat-text-primary);
     transition: background 0.3s, color 0.3s;
 }
+
 body {
     display: flex;
     flex-direction: column;
     height: 100vh;
     height: 100dvh;
-    padding-top: var(--nav-height);  /* 为固定导航栏留出空间 */
+    overflow: hidden;               /* 禁止页面整体滚动 */
+    padding-top: 0;                 /* 删除之前预留顶部空间的操作 */
     background: var(--wechat-bg);
+    color: var(--wechat-text-primary);
+    margin: 0;
 }
 
 body.with-background .chat-area {
@@ -70,7 +74,7 @@ body.with-background .chat-area {
     top: 0;
     left: 0;
     right: 0;
-    z-index: 200;
+    z-index: 999;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -152,21 +156,23 @@ body.with-background .chat-area {
 }
 
 /* ===== 聊天区域 ===== */
+
 .chat-area {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
     padding: 12px 16px 8px;
+    /* 重点：顶部留出导航栏高度，底部留出固定输入框高度 */
+    padding-top: calc(var(--nav-height) + 8px);      /* 防止消息被顶部栏盖住 */
+    padding-bottom: calc(80px + var(--safe-bottom)); /* 防止消息被底部栏盖住 */
     display: flex;
     flex-direction: column;
     gap: 4px;
     scroll-behavior: smooth;
     background: var(--wechat-bg);
-    transition: background 0.3s;
-    min-height: 0;
 }
+
 .chat-area::-webkit-scrollbar {
     width: 0;
     display: none;
@@ -351,14 +357,17 @@ body.with-background .chat-area {
 
 /* ===== 底部输入栏（不固定，作为 flex 子项） ===== */
 .wechat-input-bar {
-    flex-shrink: 0;
+    position: fixed;         /* 改固定定位，脱离文档流 */
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;            /* 层级保证在消息之上 */
     display: flex;
     align-items: flex-end;
     gap: 6px;
     padding: 8px 12px calc(10px + var(--safe-bottom));
     background: var(--wechat-nav-bg);
     border-top: 0.5px solid var(--wechat-border);
-    transition: background 0.3s, border-color 0.3s;
     box-sizing: border-box;
 }
 

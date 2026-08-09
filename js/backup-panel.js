@@ -249,13 +249,13 @@
                         reloadNeeded = true;
                     }
 
-                    // 2. 处理昵称数据
-                    if (data.partnerName && typeof window.setPartnerName === 'function') {
-                        window.setPartnerName(data.partnerName);
+                    // ★ 【关键修复】直接给全局变量赋值，取代不存在的 setPartnerName/setMyName
+                    if (data.partnerName && typeof window.partnerName !== 'undefined') {
+                        window.partnerName = data.partnerName;
                         reloadNeeded = true;
                     }
-                    if (data.myName && typeof window.setMyName === 'function') {
-                        window.setMyName(data.myName);
+                    if (data.myName && typeof window.myName !== 'undefined') {
+                        window.myName = data.myName;
                         reloadNeeded = true;
                     }
 
@@ -263,8 +263,8 @@
                     if (reloadNeeded) {
                         if (typeof window.saveMessages === 'function') await window.saveMessages();
                         const contactName = document.getElementById('contactName');
-                        if (contactName && typeof window.getPartnerName === 'function') {
-                            contactName.textContent = window.getPartnerName();
+                        if (contactName) {
+                            contactName.textContent = window.partnerName; // 直接取最新变量更新导航栏
                         }
                         if (typeof window.renderMessages === 'function') window.renderMessages();
                         if (typeof window.showToast === 'function') window.showToast('头像、背景及昵称恢复成功', 'success');

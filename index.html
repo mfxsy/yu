@@ -13,7 +13,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <link rel="stylesheet" href="css/styles.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js">
+    </script>
 </head>
 <body>
 
@@ -32,18 +33,18 @@
     <div class="chat-wrapper">
         <!-- 聊天区域 -->
         <div class="chat-area" id="chatArea"></div>
+    </div>
 
-        <!-- 底部输入栏 -->
-        <div class="wechat-input-bar" id="inputBar">
-            <button class="btn-icon call-btn" id="callBtn" title="通话"><i class="fas fa-phone"></i></button>
+    <!-- 底部输入栏 -->
+    <div class="wechat-input-bar" id="inputBar">
+        <button class="btn-icon call-btn" id="callBtn" title="通话"><i class="fas fa-phone"></i></button>
 
-            <div class="input-wrap">
-                <textarea id="msgInput" rows="1" placeholder="输入消息…" maxlength="500"></textarea>
-                <button class="btn-send" id="sendBtn" title="发送"><i class="fas fa-arrow-up"></i></button>
-            </div>
-            <button class="btn-icon" id="emojiBtn" title="表情包"><i class="far fa-smile"></i></button>
-            <button class="btn-icon settings-btn" id="settingsBtn" title="更多功能"><i class="fas fa-plus"></i></button>
+        <div class="input-wrap">
+            <textarea id="msgInput" rows="1" placeholder="输入消息…" maxlength="500"></textarea>
+            <button class="btn-send" id="sendBtn" title="发送"><i class="fas fa-arrow-up"></i></button>
         </div>
+        <button class="btn-icon" id="emojiBtn" title="表情包"><i class="far fa-smile"></i></button>
+        <button class="btn-icon settings-btn" id="settingsBtn" title="更多功能"><i class="fas fa-plus"></i></button>
     </div>
 
     <!-- ===== 字卡面板 ===== -->
@@ -321,14 +322,14 @@
                     <div style="font-weight:600;margin-bottom:8px;">回复速度</div>
                     <div style="display:flex;flex-direction:column;gap:6px;">
                         <div style="display:flex;justify-content:space-between;align-items:center;">
-                            <span style="font-size:13px;color:var(--wechat-text-secondary);">最短时间：<span id="replyMinDisplay">1</span>s</span>
+                            <span style="font-size:13px;color:var(--wechat-text-secondary);">最短时间：<span id="replyMinDisplay"style="display:inline-block; width:22px; text-align:right;">1</span> s</span>
                             <input type="range" id="replyMinSlider" min="1" max="30" value="1" step="1" style="flex:1;margin:0 12px;" />
-                            <span style="font-size:13px;color:var(--wechat-text-secondary);">30s</span>
+                            <span style="font-size:13px;color:var(--wechat-text-secondary);">30 s</span>
                         </div>
                         <div style="display:flex;justify-content:space-between;align-items:center;">
-                            <span style="font-size:13px;color:var(--wechat-text-secondary);">最长时间：<span id="replyMaxDisplay">30</span>s</span>
+                            <span style="font-size:13px;color:var(--wechat-text-secondary);">最长时间：<span id="replyMaxDisplay"style="display:inline-block; width:22px; text-align:right;">30</span> s</span>
                             <input type="range" id="replyMaxSlider" min="30" max="180" value="30" step="1" style="flex:1;margin:0 12px;" />
-                            <span style="font-size:13px;color:var(--wechat-text-secondary);">3min</span>
+                            <span style="font-size:13px;color:var(--wechat-text-secondary);">180 s</span>
                         </div>
                     </div>
                 </div>
@@ -341,9 +342,9 @@
                         </label>
                     </div>
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
-                        <span style="font-size:13px;color:var(--wechat-text-secondary);">时间间隔：<span id="activeIntervalDisplay">5</span> 分钟</span>
-                        <input type="range" id="activeIntervalSlider" min="1" max="300" value="5" step="1" style="flex:1;margin:0 12px;" />
-                        <span style="font-size:13px;color:var(--wechat-text-secondary);">300min</span>
+                        <span style="font-size:13px;color:var(--wechat-text-secondary);">时间间隔：<span id="activeIntervalDisplay"style="display:inline-block; width:20px; text-align:right;">5</span> min</span>
+                        <input type="range" id="activeIntervalSlider" min="1" max="180" value="5" step="1" style="flex:1;margin:0 12px;" />
+                        <span style="font-size:13px;color:var(--wechat-text-secondary);">180 min</span>
                     </div>
                 </div>
                 <div style="border-top:1px solid var(--wechat-border);padding-top:16px;">
@@ -376,19 +377,30 @@
     <div class="toast" id="toast"></div>
 
     <!-- ===== 脚本加载 ===== -->
-    <script src="./js/session-manager.js"></script>
-    <script src="./js/card-manager.js"></script>
-    <script src="./js/emoji-manager.js"></script>
-    <script src="./js/avatar-manager.js"></script>
-    <script src="./js/quote-manager.js"></script>
-    <script src="./js/frequency-manager.js"></script>
-    <script src="./js/call-manager.js"></script>
-    <script src="./js/backup-panel.js"></script>
-    <script src="./js/share-import.js"></script>
+    <script src="./js/session-manager.js">
+    </script>
+    <script src="./js/card-manager.js">
+    </script>
+    <script src="./js/emoji-manager.js">
+    </script>
+    <script src="./js/avatar-manager.js">
+    </script>
+    <script src="./js/quote-manager.js">
+    </script>
+    <script src="./js/frequency-manager.js">
+    </script>
+    <script src="./js/call-manager.js">
+    </script>
+    <script src="./js/backup-panel.js">
+    </script>
 
     <!-- =============================================================
-         主程序（修复了功能设置持续重置的问题，移除了备份内联代码）
-         ============================================================= -->
+    主程序（增量更新版）
+    修复点：
+    1. 抛弃全局重绘，改用 DOM 增量追加，彻底消除刷新感
+    2. 键盘收起防抖滚动 + 顺滑滚动逻辑保持
+    3. 追加消息后自动滚动到底部，不被底部栏遮挡
+    ============================================================= -->
     <script>
         (function() {
             'use strict';
@@ -415,10 +427,14 @@
             const chatArea = document.getElementById('chatArea');
             const msgInput = document.getElementById('msgInput');
             const sendBtn = document.getElementById('sendBtn');
+            const inputBar = document.getElementById('inputBar');
             const contactName = document.getElementById('contactName');
             const contactStatus = document.getElementById('contactStatus');
             const themeToggle = document.getElementById('themeToggle');
             const toast = document.getElementById('toast');
+
+            // ✅ 追踪最后一次渲染的日期键，用于增量追加时判断
+            let _lastDateKey = '';
 
             // ---------- 工具 ----------
             function getRandomItem(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
@@ -436,7 +452,7 @@
                 if (isNaN(date.getTime())) return '1970-01-01';
                 const d = date;
                 return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2,
-                '0');
+                    '0');
             }
 
             function showToast(text, type, duration) {
@@ -582,7 +598,7 @@
             }
             window.saveMessages = saveMessages;
 
-            // ---------- 渲染消息 ----------
+            // ---------- 渲染消息（全量构建，用于页面初始加载） ----------
             function renderMessages() {
                 const myAv = window.avatarManager ? window.avatarManager.getMyAvatar() : null;
                 const partnerAv = window.avatarManager ? window.avatarManager.getPartnerAvatar() : null;
@@ -594,8 +610,9 @@
                     <p style="font-size:15px;font-weight:500;">开始你们的对话</p>
                 </div>
                 `;
-                return;
-            }
+                    _lastDateKey = '';
+                    return;
+                }
 
                 let html = '';
                 let lastDateKey = '';
@@ -673,11 +690,127 @@
                 });
 
                 chatArea.innerHTML = html;
+
+                // ✅ 记录最后一条消息的日期，供后续追加使用
+                if (window.messages.length > 0) {
+                    const lastMsg = window.messages[window.messages.length - 1];
+                    _lastDateKey = getDateKey(lastMsg.time);
+                } else {
+                    _lastDateKey = '';
+                }
+
+                // ✅ 延迟滚动，确保高度计算完成
+                setTimeout(() => {
+                    chatArea.scrollTop = chatArea.scrollHeight;
+                }, 30);
+            }
+            window.renderMessages = renderMessages;
+
+            // ✅ 【核心修复】增量追加单条消息到 DOM（绝不重绘顶部）+ 自动滚动到底部
+            function appendMessageDOM(msg) {
+                const myAv = window.avatarManager ? window.avatarManager.getMyAvatar() : null;
+                const partnerAv = window.avatarManager ? window.avatarManager.getPartnerAvatar() : null;
+
+                // 1. 检查是否需要追加日期
+                const dateKey = getDateKey(msg.time);
+                if (dateKey !== _lastDateKey) {
+                    const label = (() => {
+                        const now = new Date();
+                        const today = getDateKey(now);
+                        const yesterday = getDateKey(new Date(now.getTime() - 86400000));
+                        if (dateKey === today) return '今天';
+                        if (dateKey === yesterday) return '昨天';
+                        const d = msg.time;
+                        return d.getFullYear() + '年' + String(d.getMonth() + 1) + '月' + String(d.getDate()) + '日';
+                    })();
+                    const ts = document.createElement('div');
+                    ts.className = 'msg-timestamp';
+                    ts.textContent = label;
+                    chatArea.appendChild(ts);
+                    _lastDateKey = dateKey;
+                }
+
+                if (msg.type === 'system') {
+                    const sys = document.createElement('div');
+                    sys.className = 'msg-system';
+                    sys.textContent = msg.text;
+                    chatArea.appendChild(sys);
+
+                    // ✅ 系统消息也要滚动到底部
+                    requestAnimationFrame(() => {
+                        chatArea.scrollTop = chatArea.scrollHeight;
+                    });
+                    setTimeout(() => {
+                        chatArea.scrollTop = chatArea.scrollHeight;
+                    }, 150);
+                    return;
+                }
+
+                // 2. 构建气泡 DOM
+                const isSent = msg.sender === 'me';
+                const avatarSrc = isSent ? myAv : partnerAv;
+                const avatarHtml = avatarSrc ? `<img src="${avatarSrc}" alt="" />` : `<i class="fas fa-user"></i>`;
+
+                let replyHtml = '';
+                if (msg.replyTo) {
+                    let senderName = (msg.replyToSender === 'me') ? window.myName : window.partnerName;
+                    const replyContent = msg.replyToText || '';
+                    replyHtml = `<div class="quote-preview"><span>${senderName}：${replyContent.substring(0, 30)}${replyContent.length > 30 ? '…' : ''}</span></div>`;
+                }
+
+                const isImgOnly = msg.image && !msg.text;
+                let bubbleContent = '';
+                if (msg.text) bubbleContent += msg.text.replace(/\n/g, '<br />');
+                if (msg.image) {
+                    const imgHtml =
+                        `<img src="${msg.image}" alt="图片" onclick="window._viewImage && window._viewImage('${msg.image.replace(/'/g, "\\'")}')" loading="lazy" />`;
+                    bubbleContent += bubbleContent ? ('<br />' + imgHtml) : imgHtml;
+                }
+                const finalBubbleContent = replyHtml + (bubbleContent ? `<div>${bubbleContent}</div>` : '');
+                const bubbleClass = (isSent ? 'sent' : 'recv') + (isImgOnly ? ' img-only' : '');
+                const timeStr = formatTime(msg.time);
+                const timeHtml = showTimestamp ? `<span>${timeStr}</span>` : '';
+
+                const row = document.createElement('div');
+                row.className = `msg-row ${isSent ? 'sent' : 'recv'}`;
+                row.dataset.msgId = msg.id;
+                row.innerHTML = `
+                    <div class="msg-avatar">${avatarHtml}</div>
+                    <div class="msg-bubble-wrap">
+                        <div class="msg-bubble ${bubbleClass}">${finalBubbleContent}</div>
+                        <div class="msg-meta">
+                            ${timeHtml}
+                            ${isSent ? `<span class="read-status ${msg.read ? 'read' : ''}">${msg.read ? '<i class="fas fa-check-circle"></i>' : '<i class="fas fa-check"></i>'}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+                chatArea.appendChild(row);
+
+                // ✅ 关键修复：双重滚动机制，确保键盘收起或图片加载后位置正确
+                // 1. 下一帧立即滚动（DOM 刚更新）
                 requestAnimationFrame(() => {
                     chatArea.scrollTop = chatArea.scrollHeight;
                 });
+                // 2. 延迟 150ms 再次滚动（给图片加载和浏览器布局重排留出时间）
+                setTimeout(() => {
+                    chatArea.scrollTop = chatArea.scrollHeight;
+                }, 150);
             }
-            window.renderMessages = renderMessages;
+
+                window.appendMessageDOM = appendMessageDOM; // 对外暴露这个接口
+
+
+            // ✅ 只更新单条消息的已读回执
+            function updateReadReceipt(msgId) {
+                const row = chatArea.querySelector(`.msg-row[data-msg-id="${msgId}"]`);
+                if (row) {
+                    const statusEl = row.querySelector('.msg-meta .read-status');
+                    if (statusEl) {
+                        statusEl.className = 'read-status read';
+                        statusEl.innerHTML = '<i class="fas fa-check-circle"></i>';
+                    }
+                }
+            }
 
             // ---------- 发送消息 ----------
             window.sendMessage = async function(text, image) {
@@ -706,12 +839,20 @@
                 }
 
                 window.messages.push(msg);
-                renderMessages();
+
+                // ✅ 仅第一条消息调用全量刷新以移除“空状态”，后续全增量追加
+                if (window.messages.length === 1) {
+                    renderMessages();
+                } else {
+                    appendMessageDOM(msg);
+                }
+
                 await saveMessages();
 
+                // 已读回执只更新 DOM，不刷新列表
                 setTimeout(async () => {
                     msg.read = true;
-                    renderMessages();
+                    updateReadReceipt(msg.id);
                     await saveMessages();
                 }, 800 + Math.random() * 1200);
 
@@ -719,7 +860,7 @@
                 return true;
             };
 
-            // ---------- 添加外部消息 ----------
+            // ---------- 添加外部消息（增量追加） ----------
             window.addMessage = function(text, sender, type) {
                 sender = sender || 'me';
                 type = type || 'normal';
@@ -733,14 +874,19 @@
                     type: type
                 };
                 window.messages.push(msg);
-                renderMessages();
+
+                if (window.messages.length === 1) {
+                    renderMessages();
+                } else {
+                    appendMessageDOM(msg);
+                }
                 saveMessages();
                 if (sender === 'partner') {
                     sendNotification();
                 }
             };
 
-            // ---------- 回复逻辑 ----------
+            // ---------- 回复逻辑（增量追加） ----------
             function triggerReply(fromActive) {
                 if (isTyping) return;
 
@@ -770,7 +916,8 @@
                             type: 'normal',
                         };
                         window.messages.push(hint);
-                        renderMessages();
+                        if (window.messages.length === 1) renderMessages();
+                        else appendMessageDOM(hint);
                         await saveMessages();
                         sendNotification();
                     }, 600);
@@ -836,7 +983,8 @@
                     }
 
                     window.messages.push(reply);
-                    renderMessages();
+                    if (window.messages.length === 1) renderMessages();
+                    else appendMessageDOM(reply);
                     await saveMessages();
                     sendNotification();
 
@@ -853,7 +1001,8 @@
                                 type: 'normal',
                             };
                             window.messages.push(extraMsg);
-                            renderMessages();
+                            if (window.messages.length === 1) renderMessages();
+                            else appendMessageDOM(extraMsg);
                             await saveMessages();
                             sendNotification();
                         }
@@ -951,6 +1100,52 @@
                     });
                 }
 
+                // ✅ 动态更新底部留白 + 顺滑防抖滚动
+                function updateChatPadding() {
+                    const inputBarHeight = inputBar.offsetHeight;
+                    chatArea.style.paddingBottom = (inputBarHeight + 20) + 'px';
+                }
+                updateChatPadding();
+
+                let resizeTimer = null;
+                let prevInnerHeight = window.innerHeight;
+                window.addEventListener('resize', function() {
+                    clearTimeout(resizeTimer);
+                    if (window.innerHeight > prevInnerHeight) {
+                        resizeTimer = setTimeout(() => {
+                            updateChatPadding();
+                            chatArea.scrollTo({ top: chatArea.scrollHeight, behavior: 'smooth' });
+                        }, 150);
+                    }
+                    prevInnerHeight = window.innerHeight;
+                });
+
+                // ✅ 【关键修复】移动端键盘收起时，增加深度防抖和延时滚动
+                if (window.visualViewport) {
+                    let viewportTimer = null;
+                    let prevViewportHeight = window.visualViewport.height;
+                    window.visualViewport.addEventListener('resize', function() {
+                        clearTimeout(viewportTimer);
+                        const currentHeight = window.visualViewport.height;
+                        
+                        // 当视口高度变大（说明键盘正在收起）时，触发延迟滚动
+                        if (currentHeight > prevViewportHeight) {
+                            viewportTimer = setTimeout(() => {
+                                // 1. 先更新底部留白
+                                updateChatPadding(); 
+                                // 2. 平滑滚动到底部
+                                chatArea.scrollTo({ top: chatArea.scrollHeight, behavior: 'smooth' });
+                                
+                                // 3. 双重保障：某些浏览器滚动动画完成后位置可能不准，再强行置底一次
+                                setTimeout(() => {
+                                    chatArea.scrollTop = chatArea.scrollHeight;
+                                }, 250);
+                            }, 300); // 延迟 300ms，等待输入栏动画彻底结束
+                        }
+                        prevViewportHeight = currentHeight;
+                    });
+                }
+
                 // 挂载按钮事件
                 sendBtn.addEventListener('click', function() {
                     const text = msgInput.value;
@@ -972,6 +1167,7 @@
                 msgInput.addEventListener('input', function() {
                     this.style.height = 'auto';
                     this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+                    updateChatPadding();
                 });
 
                 themeToggle.addEventListener('click', toggleTheme);
@@ -998,7 +1194,8 @@
                             case 'message':
                                 document.getElementById('messageSettingsPanel').classList.add('open');
                                 break;
-                            default: break;
+                            default:
+                                break;
                         }
                     });
                 });
@@ -1152,7 +1349,7 @@
                     window.SESSION_ID = e.detail.sessionId;
                     sessionList = window.sessionManager.getSessionList();
                     window.getSessionId = function() { return window.SESSION_ID; };
-                    
+
                     if (window.frequencyManager) {
                         await window.frequencyManager.load();
                         window.frequencyManager.restartActiveTimer(() => {
@@ -1209,55 +1406,57 @@
 
                 msgInput.focus();
                 console.log('✅ 主程序启动完成,会话ID:', window.SESSION_ID);
+
             }
 
             // ===== 频率面板渲染（修复版） =====
             function renderFrequencyPanel() {
-                if (!window.frequencyManager) {
-                    console.warn('[频率] frequencyManager 未加载');
-                    return;
-                }
-                const settings = window.frequencyManager.getSettings();
-                console.log('[频率] 渲染面板，当前设置:', settings);
+    if (!window.frequencyManager) {
+        console.warn('[频率] frequencyManager 未加载');
+        return;
+    }
+    const settings = window.frequencyManager.getSettings();
+    console.log('[频率] 渲染面板，当前设置:', settings);
 
-                const minSlider = document.getElementById('replyMinSlider');
-                const minDisplay = document.getElementById('replyMinDisplay');
-                if (minSlider) {
-                    minSlider.value = settings.replyMin || 1;
-                    if (minDisplay) minDisplay.textContent = settings.replyMin || 1;
-                }
+    // ----- 滑块位置与显示文字同步 -----
+    const minSlider = document.getElementById('replyMinSlider');
+    const minDisplay = document.getElementById('replyMinDisplay');
+    if (minSlider) {
+        minSlider.value = settings.replyMin || 1;          // ★ 设置滑块物理位置
+        if (minDisplay) minDisplay.textContent = settings.replyMin || 1;
+    }
 
-                const maxSlider = document.getElementById('replyMaxSlider');
-                const maxDisplay = document.getElementById('replyMaxDisplay');
-                if (maxSlider) {
-                    maxSlider.value = settings.replyMax || 30;
-                    if (maxDisplay) maxDisplay.textContent = settings.replyMax || 30;
-                }
+    const maxSlider = document.getElementById('replyMaxSlider');
+    const maxDisplay = document.getElementById('replyMaxDisplay');
+    if (maxSlider) {
+        maxSlider.value = settings.replyMax || 30;         // ★ 设置滑块物理位置
+        if (maxDisplay) maxDisplay.textContent = settings.replyMax || 30;
+    }
 
-                const activeToggle = document.getElementById('activeEnabledToggle');
-                if (activeToggle) {
-                    activeToggle.checked = settings.activeEnabled || false;
-                }
+    const activeToggle = document.getElementById('activeEnabledToggle');
+    if (activeToggle) {
+        activeToggle.checked = settings.activeEnabled || false;
+    }
 
-                const intervalSlider = document.getElementById('activeIntervalSlider');
-                const intervalDisplay = document.getElementById('activeIntervalDisplay');
-                if (intervalSlider) {
-                    intervalSlider.value = settings.activeInterval || 5;
-                    if (intervalDisplay) intervalDisplay.textContent = settings.activeInterval || 5;
-                }
+    const intervalSlider = document.getElementById('activeIntervalSlider');
+    const intervalDisplay = document.getElementById('activeIntervalDisplay');
+    if (intervalSlider) {
+        intervalSlider.value = settings.activeInterval || 5; // ★ 设置滑块物理位置
+        if (intervalDisplay) intervalDisplay.textContent = settings.activeInterval || 5;
+    }
 
-                const mergeEmoji = document.getElementById('mergeEmojiToggle');
-                if (mergeEmoji) {
-                    mergeEmoji.checked = settings.mergeEmoji || false;
-                }
+    const mergeEmoji = document.getElementById('mergeEmojiToggle');
+    if (mergeEmoji) {
+        mergeEmoji.checked = settings.mergeEmoji || false;
+    }
 
-                const mergeCards = document.getElementById('mergeCardsToggle');
-                if (mergeCards) {
-                    mergeCards.checked = settings.mergeCards || false;
-                }
+    const mergeCards = document.getElementById('mergeCardsToggle');
+    if (mergeCards) {
+        mergeCards.checked = settings.mergeCards || false;
+    }
 
-                bindFrequencyEvents();
-            }
+    bindFrequencyEvents();
+}
 
             // ===== 频率事件绑定（修复版） =====
             let frequencyEventsBound = false;
@@ -1356,10 +1555,18 @@
             }
 
             document.addEventListener('frequencySettingsChanged', function() {
-                if (document.getElementById('frequencySettingsPanel').classList.contains('open')) {
-                    renderFrequencyPanel();
-                }
-            });
+            const panel = document.getElementById('frequencySettingsPanel');
+            if (panel && panel.classList.contains('open')) {
+        // 只更新显示数字，不重置滑块位置
+            const display = document.getElementById('activeIntervalDisplay');
+            if (display) {
+            const settings = window.frequencyManager.getSettings();
+            display.textContent = settings.activeInterval || 5;
+            }
+        // 其他需要同步的显示（如回复速度的 min/max）也可以单独更新
+        // 但为避免干扰，建议只更新文字
+            }
+        });
 
             // ★ 增加 300ms 延迟，模仿新版加载动画，避开手机浏览器的恢复冲突
             function delayedInit() {

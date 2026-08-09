@@ -229,16 +229,24 @@
     }
 
     function initUI() {
-        renderUI();
-        bindUIEvents();
-        // 监听设置变化，当面板打开时重新渲染
-        document.addEventListener('frequencySettingsChanged', function() {
-            const panel = document.getElementById('frequencySettingsPanel');
-            if (panel && panel.classList.contains('open')) {
-                renderUI();
-            }
-        });
-    }
+    renderUI();
+    bindUIEvents();
+    // 监听设置变化，只更新显示文字，避免干扰拖动
+    document.addEventListener('frequencySettingsChanged', function() {
+        const panel = document.getElementById('frequencySettingsPanel');
+        if (panel && panel.classList.contains('open')) {
+            // 只更新显示数字，不设置滑块 value
+            const settings = frequencyManager.getSettings();
+            const minDisplay = document.getElementById('replyMinDisplay');
+            if (minDisplay) minDisplay.textContent = settings.replyMin || 1;
+            const maxDisplay = document.getElementById('replyMaxDisplay');
+            if (maxDisplay) maxDisplay.textContent = settings.replyMax || 30;
+            const intervalDisplay = document.getElementById('activeIntervalDisplay');
+            if (intervalDisplay) intervalDisplay.textContent = settings.activeInterval || 5;
+            // 注意：不要更新 slider.value，让用户拖动不受干扰
+        }
+    });
+}
 
     // ---------- 核心管理对象 ----------
     const frequencyManager = {
