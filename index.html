@@ -15,6 +15,20 @@
     <link rel="stylesheet" href="css/styles.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js">
     </script>
+
+    <!-- 将原有 styles.css 的追加修改内联（若您未修改原 styles.css，这些新增代码将被应用） -->
+    <style>
+        /* ===== 追加：增强导航栏固定性 ===== */
+        .wechat-nav {
+            z-index: 999 !important; /* 确保始终在其他元素之上 */
+        }
+        /* ===== 追加：防止键盘弹出时页面整体位移 ===== */
+        html, body {
+            position: relative;
+            height: 100%;
+            overflow: hidden;
+        }
+    </style>
 </head>
 <body>
 
@@ -598,6 +612,21 @@
             }
             window.saveMessages = saveMessages;
 
+            // ---------- 统一滚动到底部函数（新增） ----------
+            function scrollToBottom() {
+                if (!chatArea) return;
+                // 1. 立即强制滚动
+                chatArea.scrollTop = chatArea.scrollHeight;
+                // 2. 下一帧再次强制（给浏览器布局时间）
+                requestAnimationFrame(() => {
+                    chatArea.scrollTop = chatArea.scrollHeight;
+                });
+                // 3. 延迟 150ms 再次强制（确保图片加载后位置正确）
+                setTimeout(() => {
+                    chatArea.scrollTop = chatArea.scrollHeight;
+                }, 150);
+            }
+
             // ---------- 渲染消息（全量构建，用于页面初始加载） ----------
             function renderMessages() {
                 const myAv = window.avatarManager ? window.avatarManager.getMyAvatar() : null;
@@ -700,9 +729,7 @@
                 }
 
                 // ✅ 延迟滚动，确保高度计算完成
-                setTimeout(() => {
-                    chatArea.scrollTop = chatArea.scrollHeight;
-                }, 30);
+                setTimeout(scrollToBottom, 30);
             }
             window.renderMessages = renderMessages;
 
@@ -735,14 +762,7 @@
                     sys.className = 'msg-system';
                     sys.textContent = msg.text;
                     chatArea.appendChild(sys);
-
-                    // ✅ 系统消息也要滚动到底部
-                    requestAnimationFrame(() => {
-                        chatArea.scrollTop = chatArea.scrollHeight;
-                    });
-                    setTimeout(() => {
-                        chatArea.scrollTop = chatArea.scrollHeight;
-                    }, 150);
+                    scrollToBottom();
                     return;
                 }
 
@@ -786,18 +806,11 @@
                 `;
                 chatArea.appendChild(row);
 
-                // ✅ 关键修复：双重滚动机制，确保键盘收起或图片加载后位置正确
-                // 1. 下一帧立即滚动（DOM 刚更新）
-                requestAnimationFrame(() => {
-                    chatArea.scrollTop = chatArea.scrollHeight;
-                });
-                // 2. 延迟 150ms 再次滚动（给图片加载和浏览器布局重排留出时间）
-                setTimeout(() => {
-                    chatArea.scrollTop = chatArea.scrollHeight;
-                }, 150);
+                // ✅ 关键修复：使用统一滚动函数，确保键盘收起或图片加载后位置正确
+                scrollToBottom();
             }
 
-                window.appendMessageDOM = appendMessageDOM; // 对外暴露这个接口
+            window.appendMessageDOM = appendMessageDOM; // 对外暴露这个接口
 
 
             // ✅ 只更新单条消息的已读回执
@@ -846,6 +859,9 @@
                 } else {
                     appendMessageDOM(msg);
                 }
+
+                // ✅ 发送后立即触发滚动，确保消息可见
+                scrollToBottom();
 
                 await saveMessages();
 
@@ -1114,7 +1130,7 @@
                     if (window.innerHeight > prevInnerHeight) {
                         resizeTimer = setTimeout(() => {
                             updateChatPadding();
-                            chatArea.scrollTo({ top: chatArea.scrollHeight, behavior: 'smooth' });
+                            scrollToBottom();
                         }, 150);
                     }
                     prevInnerHeight = window.innerHeight;
@@ -1133,13 +1149,8 @@
                             viewportTimer = setTimeout(() => {
                                 // 1. 先更新底部留白
                                 updateChatPadding(); 
-                                // 2. 平滑滚动到底部
-                                chatArea.scrollTo({ top: chatArea.scrollHeight, behavior: 'smooth' });
-                                
-                                // 3. 双重保障：某些浏览器滚动动画完成后位置可能不准，再强行置底一次
-                                setTimeout(() => {
-                                    chatArea.scrollTop = chatArea.scrollHeight;
-                                }, 250);
+                                // 2. 使用统一函数滚动到底部
+                                scrollToBottom();
                             }, 300); // 延迟 300ms，等待输入栏动画彻底结束
                         }
                         prevViewportHeight = currentHeight;
@@ -1411,52 +1422,52 @@
 
             // ===== 频率面板渲染（修复版） =====
             function renderFrequencyPanel() {
-    if (!window.frequencyManager) {
-        console.warn('[频率] frequencyManager 未加载');
-        return;
-    }
-    const settings = window.frequencyManager.getSettings();
-    console.log('[频率] 渲染面板，当前设置:', settings);
+                if (!window.frequencyManager) {
+                    console.warn('[频率] frequencyManager 未加载');
+                    return;
+                }
+                const settings = window.frequencyManager.getSettings();
+                console.log('[频率] 渲染面板，当前设置:', settings);
 
-    // ----- 滑块位置与显示文字同步 -----
-    const minSlider = document.getElementById('replyMinSlider');
-    const minDisplay = document.getElementById('replyMinDisplay');
-    if (minSlider) {
-        minSlider.value = settings.replyMin || 1;          // ★ 设置滑块物理位置
-        if (minDisplay) minDisplay.textContent = settings.replyMin || 1;
-    }
+                // ----- 滑块位置与显示文字同步 -----
+                const minSlider = document.getElementById('replyMinSlider');
+                const minDisplay = document.getElementById('replyMinDisplay');
+                if (minSlider) {
+                    minSlider.value = settings.replyMin || 1;          // ★ 设置滑块物理位置
+                    if (minDisplay) minDisplay.textContent = settings.replyMin || 1;
+                }
 
-    const maxSlider = document.getElementById('replyMaxSlider');
-    const maxDisplay = document.getElementById('replyMaxDisplay');
-    if (maxSlider) {
-        maxSlider.value = settings.replyMax || 30;         // ★ 设置滑块物理位置
-        if (maxDisplay) maxDisplay.textContent = settings.replyMax || 30;
-    }
+                const maxSlider = document.getElementById('replyMaxSlider');
+                const maxDisplay = document.getElementById('replyMaxDisplay');
+                if (maxSlider) {
+                    maxSlider.value = settings.replyMax || 30;         // ★ 设置滑块物理位置
+                    if (maxDisplay) maxDisplay.textContent = settings.replyMax || 30;
+                }
 
-    const activeToggle = document.getElementById('activeEnabledToggle');
-    if (activeToggle) {
-        activeToggle.checked = settings.activeEnabled || false;
-    }
+                const activeToggle = document.getElementById('activeEnabledToggle');
+                if (activeToggle) {
+                    activeToggle.checked = settings.activeEnabled || false;
+                }
 
-    const intervalSlider = document.getElementById('activeIntervalSlider');
-    const intervalDisplay = document.getElementById('activeIntervalDisplay');
-    if (intervalSlider) {
-        intervalSlider.value = settings.activeInterval || 5; // ★ 设置滑块物理位置
-        if (intervalDisplay) intervalDisplay.textContent = settings.activeInterval || 5;
-    }
+                const intervalSlider = document.getElementById('activeIntervalSlider');
+                const intervalDisplay = document.getElementById('activeIntervalDisplay');
+                if (intervalSlider) {
+                    intervalSlider.value = settings.activeInterval || 5; // ★ 设置滑块物理位置
+                    if (intervalDisplay) intervalDisplay.textContent = settings.activeInterval || 5;
+                }
 
-    const mergeEmoji = document.getElementById('mergeEmojiToggle');
-    if (mergeEmoji) {
-        mergeEmoji.checked = settings.mergeEmoji || false;
-    }
+                const mergeEmoji = document.getElementById('mergeEmojiToggle');
+                if (mergeEmoji) {
+                    mergeEmoji.checked = settings.mergeEmoji || false;
+                }
 
-    const mergeCards = document.getElementById('mergeCardsToggle');
-    if (mergeCards) {
-        mergeCards.checked = settings.mergeCards || false;
-    }
+                const mergeCards = document.getElementById('mergeCardsToggle');
+                if (mergeCards) {
+                    mergeCards.checked = settings.mergeCards || false;
+                }
 
-    bindFrequencyEvents();
-}
+                bindFrequencyEvents();
+            }
 
             // ===== 频率事件绑定（修复版） =====
             let frequencyEventsBound = false;
@@ -1555,18 +1566,18 @@
             }
 
             document.addEventListener('frequencySettingsChanged', function() {
-            const panel = document.getElementById('frequencySettingsPanel');
-            if (panel && panel.classList.contains('open')) {
-        // 只更新显示数字，不重置滑块位置
-            const display = document.getElementById('activeIntervalDisplay');
-            if (display) {
-            const settings = window.frequencyManager.getSettings();
-            display.textContent = settings.activeInterval || 5;
-            }
-        // 其他需要同步的显示（如回复速度的 min/max）也可以单独更新
-        // 但为避免干扰，建议只更新文字
-            }
-        });
+                const panel = document.getElementById('frequencySettingsPanel');
+                if (panel && panel.classList.contains('open')) {
+                    // 只更新显示数字，不重置滑块位置
+                    const display = document.getElementById('activeIntervalDisplay');
+                    if (display) {
+                        const settings = window.frequencyManager.getSettings();
+                        display.textContent = settings.activeInterval || 5;
+                    }
+                    // 其他需要同步的显示（如回复速度的 min/max）也可以单独更新
+                    // 但为避免干扰，建议只更新文字
+                }
+            });
 
             // ★ 增加 300ms 延迟，模仿新版加载动画，避开手机浏览器的恢复冲突
             function delayedInit() {
