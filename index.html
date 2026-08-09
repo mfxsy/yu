@@ -432,11 +432,12 @@
     </script>
 
     <!-- =============================================================
-    主程序（增强兼容版，专为 Edge 优化滚动）
+    主程序（增强兼容版，专为 Edge 优化滚动 + 键盘自动收起）
     修复点：
     1. 导航栏固定：强制 z-index 和 transform
     2. 滚动机制：移除平滑滚动，使用 scrollIntoView + 多层延时强制滚动
     3. 键盘事件：监听 focus/blur，增强 visualViewport 响应
+    4. 发送后自动收起键盘
     ============================================================= -->
     <script>
         (function() {
@@ -652,21 +653,35 @@
                         lastMsg.scrollIntoView({ behavior: 'auto', block: 'end' });
                     }
                 });
-                // 4. 延时 100ms 后再强制（Edge 可能需要更长时间布局）
+                // 4. 延时 50ms 后再强制
+                setTimeout(() => {
+                    chatArea.scrollTop = chatArea.scrollHeight;
+                    if (lastMsg) {
+                        lastMsg.scrollIntoView({ behavior: 'auto', block: 'end' });
+                    }
+                }, 50);
+                // 5. 延时 100ms
                 setTimeout(() => {
                     chatArea.scrollTop = chatArea.scrollHeight;
                     if (lastMsg) {
                         lastMsg.scrollIntoView({ behavior: 'auto', block: 'end' });
                     }
                 }, 100);
-                // 5. 延时 300ms 确保键盘完全收起后再次触底
+                // 6. 延时 200ms
+                setTimeout(() => {
+                    chatArea.scrollTop = chatArea.scrollHeight;
+                    if (lastMsg) {
+                        lastMsg.scrollIntoView({ behavior: 'auto', block: 'end' });
+                    }
+                }, 200);
+                // 7. 延时 300ms 确保键盘完全收起后再次触底
                 setTimeout(() => {
                     chatArea.scrollTop = chatArea.scrollHeight;
                     if (lastMsg) {
                         lastMsg.scrollIntoView({ behavior: 'auto', block: 'end' });
                     }
                 }, 300);
-                // 6. 额外延时 500ms（Edge 特别需要）
+                // 8. 额外延时 500ms（Edge 特别需要）
                 setTimeout(() => {
                     chatArea.scrollTop = chatArea.scrollHeight;
                     if (lastMsg) {
@@ -911,7 +926,8 @@
                 // ✅ 发送后立即触发滚动，并额外使用多重延时（确保 Edge 可见）
                 scrollToBottom();
                 setTimeout(scrollToBottom, 50);
-                setTimeout(scrollToBottom, 150);
+                setTimeout(scrollToBottom, 100);
+                setTimeout(scrollToBottom, 200);
                 setTimeout(scrollToBottom, 300);
                 setTimeout(scrollToBottom, 500);
 
@@ -1203,7 +1219,8 @@
                                 chatArea.scrollTop = chatArea.scrollHeight;
                                 // 再延时多次滚动
                                 setTimeout(scrollToBottom, 50);
-                                setTimeout(scrollToBottom, 150);
+                                setTimeout(scrollToBottom, 100);
+                                setTimeout(scrollToBottom, 200);
                                 setTimeout(scrollToBottom, 300);
                                 setTimeout(scrollToBottom, 500);
                             }, 150); // 缩短延迟，更快响应
@@ -1230,13 +1247,17 @@
                         window.sendMessage(text);
                         msgInput.value = '';
                         msgInput.style.height = 'auto';
-                        msgInput.focus();
+                        // ★★★ 发送后收起键盘 ★★★
+                        msgInput.blur();
+                        // 重新聚焦为了下次输入方便，但键盘已收起，再点击输入框会弹出
+                        // 这里不重新聚焦，让用户点击输入框再弹出
                     }
                 });
 
                 msgInput.addEventListener('keydown', function(e) {
                     if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
+                        // 模拟点击发送按钮
                         sendBtn.click();
                     }
                 });
