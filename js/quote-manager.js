@@ -148,29 +148,81 @@
     }
 
     // ---------- 显示引用UI ----------
-    function showQuote(quotedMsg) {
-        if (!quotedMsg) return;
-        quotedMessage = quotedMsg;
-        let quoteBar = document.getElementById('quoteBar');
-        if (!quoteBar) {
-            quoteBar = document.createElement('div');
-            quoteBar.id = 'quoteBar';
-            quoteBar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:var(--wechat-nav-bg);border-bottom:1px solid var(--wechat-border);font-size:13px;color:var(--wechat-text-secondary);';
-            const inputBar = document.getElementById('inputBar');
-            inputBar.parentNode.insertBefore(quoteBar, inputBar);
-        }
-        const sender = quotedMsg.sender === 'me' ? '我' : '对方';
-        const content = quotedMsg.text || (quotedMsg.image ? '[图片]' : '');
-        quoteBar.innerHTML = `
-            <span>${sender}：${content.substring(0, 50)}${content.length > 50 ? '…' : ''}</span>
-            <button id="clearQuoteBtn" style="background:none;border:none;color:var(--wechat-text-secondary);cursor:pointer;font-size:14px;"><i class="fas fa-times"></i></button>
+function showQuote(quotedMsg) {
+    if (!quotedMsg) return;
+    quotedMessage = quotedMsg;
+    let quoteBar = document.getElementById('quoteBar');
+    const inputBar = document.getElementById('inputBar');
+    if (!inputBar) return;
+
+    // 创建引用栏（如果不存在）
+    if (!quoteBar) {
+        quoteBar = document.createElement('div');
+        quoteBar.id = 'quoteBar';
+        // 使用固定定位，保证始终悬浮在输入栏上方
+        quoteBar.style.cssText = `
+            position: fixed;
+            left: 0;
+            right: 0;
+            z-index: 99;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: var(--wechat-nav-bg);
+            border-bottom: 1px solid var(--wechat-border);
+            border-top: 1px solid var(--wechat-border);
+            font-size: 13px;
+            color: var(--wechat-text-secondary);
+            min-height: 44px;
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
+            backdrop-filter: blur(4px);
         `;
-        quoteBar.style.display = 'flex';
-        document.getElementById('clearQuoteBtn').addEventListener('click', function() {
-            clearQuote();
-        });
-        if (msgInput) msgInput.focus();
+        document.body.appendChild(quoteBar);
     }
+
+    // 动态更新引用栏的位置（紧贴在输入栏顶部）
+    function updateQuotePosition() {
+        if (quoteBar.style.display === 'none') return;
+        const inputBarRect = inputBar.getBoundingClientRect();
+        // 计算底部偏移量，实现无缝黏贴
+        quoteBar.style.bottom = (window.innerHeight - inputBarRect.top) + 'px';
+    }
+
+    // 移除之前可能残留的 resize 监听，防止重复绑定
+    window.removeEventListener('resize', updateQuotePosition);
+
+    // 格式化引用信息
+    const sender = quotedMsg.sender === 'me' ? '我' : '对方';
+    // 【修复】去除字符限制，完整显示引用内容，CSS 自动处理溢出省略
+    const content = quotedMsg.text || (quotedMsg.image ? '[图片]' : '');
+
+    quoteBar.innerHTML = `
+        <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-right:8px;">
+            <span style="color:var(--wechat-green);font-weight:600;margin-right:4px;">${sender}：</span>${content}
+        </span>
+        <button id="clearQuoteBtn" style="flex-shrink:0; background:rgba(0,0,0,0.05); border:none; border-radius:50%; width:30px; height:30px; color:var(--wechat-text-secondary); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; transition:background 0.2s;">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    // 显示引用栏并更新位置
+    quoteBar.style.display = 'flex';
+    updateQuotePosition();
+    
+    // 窗口变化（如键盘弹起）时，保持引用栏始终黏贴正确位置
+    window.addEventListener('resize', updateQuotePosition);
+
+    // 绑定删除键事件
+    document.getElementById('clearQuoteBtn').addEventListener('click', function() {
+        clearQuote();
+        window.removeEventListener('resize', updateQuotePosition);
+    });
+
+    if (msgInput) msgInput.focus();
+}
+
+
 
     function clearQuote() {
         const quoteBar = document.getElementById('quoteBar');
