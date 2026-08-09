@@ -430,11 +430,7 @@
     </script>
 
     <!-- =============================================================
-    主程序（稳定版：解决输入栏弹跳）
-    优化点：
-    1. 键盘收起时先让浏览器完成布局，再更新 padding 和滚动
-    2. 滚动函数精简，减少触发次数
-    3. 统一延迟 150ms，避免与键盘动画冲突
+    主程序（稳定版：解决输入栏弹跳 + 修复引用条遮挡）
     ============================================================= -->
     <script>
         (function() {
@@ -862,12 +858,12 @@
                 await saveMessages();
 
                 setTimeout(async () => {
-                // 如果开启了“已读不回”，暂时不显示已读回执（等对方回复后再批量已读）
-                if (!noReplyEnabled) {
-                msg.read = true;
-                updateReadReceipt(msg.id);
-                await saveMessages();
-                }
+                    // 如果开启了“已读不回”，暂时不显示已读回执（等对方回复后再批量已读）
+                    if (!noReplyEnabled) {
+                        msg.read = true;
+                        updateReadReceipt(msg.id);
+                        await saveMessages();
+                    }
                 }, 800 + Math.random() * 1200);
                 triggerReply(false);
                 return true;
@@ -914,35 +910,35 @@
             // ---------- 回复逻辑（不变） ----------
 
             // ---------- 批量将我方未读消息标记为已读 ----------
-function markAllMyMessagesAsRead() {
-    let changed = false;
-    // 先把内存里的未读消息全部改成已读
-    window.messages.forEach(msg => {
-        if (msg.sender === 'me' && !msg.read) {
-            msg.read = true;
-            changed = true;
-        }
-    });
-    // 如果有未读消息变为了已读，则更新 DOM 中的图标
-    if (changed) {
-        const rows = chatArea.querySelectorAll('.msg-row.sent');
-        rows.forEach(row => {
-            const msgId = row.dataset.msgId;
-            if (msgId) {
-                const msg = window.messages.find(m => String(m.id) === String(msgId));
-                if (msg && msg.sender === 'me' && msg.read) {
-                    const statusEl = row.querySelector('.msg-meta .read-status');
-                    if (statusEl && !statusEl.classList.contains('read')) {
-                        statusEl.className = 'read-status read';
-                        statusEl.innerHTML = '<i class="fas fa-check-circle"></i>';
+            function markAllMyMessagesAsRead() {
+                let changed = false;
+                // 先把内存里的未读消息全部改成已读
+                window.messages.forEach(msg => {
+                    if (msg.sender === 'me' && !msg.read) {
+                        msg.read = true;
+                        changed = true;
                     }
+                });
+                // 如果有未读消息变为了已读，则更新 DOM 中的图标
+                if (changed) {
+                    const rows = chatArea.querySelectorAll('.msg-row.sent');
+                    rows.forEach(row => {
+                        const msgId = row.dataset.msgId;
+                        if (msgId) {
+                            const msg = window.messages.find(m => String(m.id) === String(msgId));
+                            if (msg && msg.sender === 'me' && msg.read) {
+                                const statusEl = row.querySelector('.msg-meta .read-status');
+                                if (statusEl && !statusEl.classList.contains('read')) {
+                                    statusEl.className = 'read-status read';
+                                    statusEl.innerHTML = '<i class="fas fa-check-circle"></i>';
+                                }
+                            }
+                        }
+                    });
+                    // 保存最新数据
+                    saveMessages();
                 }
             }
-        });
-        // 保存最新数据
-        saveMessages();
-    }
-}
 
             function triggerReply(fromActive) {
                 if (isTyping) return;
@@ -1045,7 +1041,7 @@ function markAllMyMessagesAsRead() {
                     await saveMessages();
                     sendNotification();
 
-                     // ✅ 在对方发送新消息后，把之前所有未读的我方消息全部标记为已读
+                    // ✅ 在对方发送新消息后，把之前所有未读的我方消息全部标记为已读
                     markAllMyMessagesAsRead();
 
                     if (Math.random() < 0.2 && textPool.length > 1) {
@@ -1102,6 +1098,28 @@ function markAllMyMessagesAsRead() {
                 showToast('昵称已更新', 'success');
             }
 
+            // ---------- 核心：动态更新底部留白（引用条自适应） ----------
+            function updateChatPadding() {
+                const inputBarHeight = inputBar.offsetHeight;
+                let quoteBarHeight = 0;
+                const quoteBar = document.getElementById('quoteBar');
+                if (quoteBar && quoteBar.style.display !== 'none') {
+                    quoteBarHeight = quoteBar.offsetHeight;
+                }
+                
+                let bottomToolbarHeight = 0;
+                if (window.visualViewport) {
+                    const diff = window.innerHeight - window.visualViewport.height;
+                    if (diff > 0) {
+                        bottomToolbarHeight = diff;
+                    }
+                }
+                const totalBottomPadding = inputBarHeight + quoteBarHeight + bottomToolbarHeight + 20;
+                chatArea.style.paddingBottom = totalBottomPadding + 'px';
+            }
+            // ★ 导出供 quote-manager.js 调用
+            window.updateChatPadding = updateChatPadding;
+
             // ---------- 初始化 ----------
             async function init() {
                 await window.sessionManager.initializeSession();
@@ -1145,11 +1163,9 @@ function markAllMyMessagesAsRead() {
                 contactName.textContent = window.partnerName;
                 renderMessages();
 
-                 // ★★★ 在这里插入以下代码 ★★★
-        if (window.callManager && typeof window.callManager.checkCallInterruption === 'function') {
-            await window.callManager.checkCallInterruption();
-        }
-        // ★★★ 插入结束 ★★★
+                if (window.callManager && typeof window.callManager.checkCallInterruption === 'function') {
+                    await window.callManager.checkCallInterruption();
+                }
 
                 if (window.cardManager && typeof window.cardManager.reload === 'function') {
                     await window.cardManager.reload();
@@ -1161,19 +1177,7 @@ function markAllMyMessagesAsRead() {
                     });
                 }
 
-                // ✅ 动态更新底部留白（只记录底部工具栏高度计算）
-                function updateChatPadding() {
-                    const inputBarHeight = inputBar.offsetHeight;
-                    let bottomToolbarHeight = 0;
-                    if (window.visualViewport) {
-                        const diff = window.innerHeight - window.visualViewport.height;
-                        if (diff > 0) {
-                            bottomToolbarHeight = diff;
-                        }
-                    }
-                    const totalBottomPadding = inputBarHeight + bottomToolbarHeight + 20;
-                    chatArea.style.paddingBottom = totalBottomPadding + 'px';
-                }
+                // ✅ 底部留白更新
                 updateChatPadding();
 
                 // ---------- 键盘与滚动事件优化（无延迟，直接使用 requestAnimationFrame） ----------
@@ -1203,8 +1207,6 @@ function markAllMyMessagesAsRead() {
                     });
                 }
 
-                
-
                 // 挂载按钮事件
                 sendBtn.addEventListener('click', function() {
                     const text = msgInput.value;
@@ -1212,7 +1214,7 @@ function markAllMyMessagesAsRead() {
                         window.sendMessage(text);
                         msgInput.value = '';
                         msgInput.style.height = 'auto';
-                       
+                        
                     }
                 });
 
@@ -1634,31 +1636,21 @@ function markAllMyMessagesAsRead() {
             }
             delayedInit();
 
-                    delayedInit();
-
-        // ---------- 修复 Safari BFCache 页面恢复滚动位置 ----------
-        window.addEventListener('pageshow', function(event) {
-            // 判断页面是否是从 BFCache（往返缓存）中加载的
-            if (event.persisted) {
-                requestAnimationFrame(() => {
-                    // 1. 先确保底部内边距计算正确（应对键盘/底部栏高度变化）
-                    if (typeof updateChatPadding === 'function') {
-                        updateChatPadding();
-                    }
-                    
-                    // 2. 强制滚动到底部
-                    if (typeof scrollToBottom === 'function') {
-                        scrollToBottom();
-                        // 不需要额外的延迟，一个 rAF 即可保证当前帧的正确高度
-                        requestAnimationFrame(scrollToBottom);
-                    }
-                });
-            }
-        });
+            // ---------- 修复 Safari BFCache 页面恢复滚动位置 ----------
+            window.addEventListener('pageshow', function(event) {
+                if (event.persisted) {
+                    requestAnimationFrame(() => {
+                        if (typeof updateChatPadding === 'function') {
+                            updateChatPadding();
+                        }
+                        if (typeof scrollToBottom === 'function') {
+                            scrollToBottom();
+                            requestAnimationFrame(scrollToBottom);
+                        }
+                    });
+                }
+            });
         })();
     </script> 
-
-        })();
-    </script>
 </body>
 </html>

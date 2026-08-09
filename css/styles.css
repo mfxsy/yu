@@ -369,8 +369,28 @@ body.with-background .chat-area {
     background: var(--wechat-nav-bg);
     border-top: 0.5px solid var(--wechat-border);
     box-sizing: border-box;
+    transform: translateZ(0); /* ★ 新增：为绝对定位子元素提供上下文 */
 }
 
+/* ★ 在 styles.css 任意位置新增以下代码 */
+#quoteBar {
+    position: absolute;
+    bottom: calc(100% + 4px); /* 悬挂在输入栏顶部之上 */
+    left: 0;
+    right: 0;
+    width: 100%;
+    padding: 6px 12px;
+    background: var(--wechat-nav-bg);
+    border-top: 1px solid var(--wechat-border);
+    border-bottom: 1px solid var(--wechat-border);
+    font-size: 13px;
+    color: var(--wechat-text-secondary);
+    z-index: 1001;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
     
 
 .wechat-input-bar .input-wrap {
@@ -966,3 +986,5 @@ body.with-background .empty-state {
 #emojiPanel .panel-sheet {
     max-height: 60vh !important;  /* 优先覆盖全局的 max-height: 82vh */
 }
+
+
