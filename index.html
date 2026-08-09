@@ -16,17 +16,40 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js">
     </script>
 
-    <!-- 将原有 styles.css 的追加修改内联（若您未修改原 styles.css，这些新增代码将被应用） -->
+    <!-- 关键修复：覆盖样式以适应 Edge 和 Safari -->
     <style>
-        /* ===== 追加：增强导航栏固定性 ===== */
+        /* 强化固定导航栏 */
         .wechat-nav {
-            z-index: 999 !important; /* 确保始终在其他元素之上 */
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 9999 !important;
+            transform: translateZ(0) !important;
+            will-change: transform !important;
+            backface-visibility: hidden !important;
         }
-        /* ===== 追加：防止键盘弹出时页面整体位移 ===== */
+
+        /* 移除平滑滚动，使用强制滚动 */
+        .chat-area {
+            scroll-behavior: auto !important;
+        }
+
+        /* 禁止页面整体滚动 */
         html, body {
-            position: relative;
-            height: 100%;
-            overflow: hidden;
+            overflow: hidden !important;
+            position: relative !important;
+            height: 100% !important;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* 确保输入栏固定 */
+        .wechat-input-bar {
+            position: fixed !important;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
         }
     </style>
 </head>
@@ -409,11 +432,11 @@
     </script>
 
     <!-- =============================================================
-    主程序（增量更新版）
+    主程序（增强兼容版）
     修复点：
-    1. 抛弃全局重绘，改用 DOM 增量追加，彻底消除刷新感
-    2. 键盘收起防抖滚动 + 顺滑滚动逻辑保持
-    3. 追加消息后自动滚动到底部，不被底部栏遮挡
+    1. 导航栏固定：强制 z-index 和 transform
+    2. 滚动机制：移除平滑滚动，使用多重强制滚动
+    3. 键盘事件：监听 focus/blur，增强 visualViewport 响应
     ============================================================= -->
     <script>
         (function() {
@@ -612,19 +635,27 @@
             }
             window.saveMessages = saveMessages;
 
-            // ---------- 统一滚动到底部函数（新增） ----------
+            // ---------- 增强版统一滚动到底部 ----------
             function scrollToBottom() {
                 if (!chatArea) return;
-                // 1. 立即强制滚动
+                // 立即强制滚动
                 chatArea.scrollTop = chatArea.scrollHeight;
-                // 2. 下一帧再次强制（给浏览器布局时间）
+                // 1帧后再次强制
                 requestAnimationFrame(() => {
                     chatArea.scrollTop = chatArea.scrollHeight;
                 });
-                // 3. 延迟 150ms 再次强制（确保图片加载后位置正确）
+                // 50ms后
+                setTimeout(() => {
+                    chatArea.scrollTop = chatArea.scrollHeight;
+                }, 50);
+                // 150ms后（图片加载完成）
                 setTimeout(() => {
                     chatArea.scrollTop = chatArea.scrollHeight;
                 }, 150);
+                // 300ms后（键盘完全收起）
+                setTimeout(() => {
+                    chatArea.scrollTop = chatArea.scrollHeight;
+                }, 300);
             }
 
             // ---------- 渲染消息（全量构建，用于页面初始加载） ----------
@@ -806,7 +837,7 @@
                 `;
                 chatArea.appendChild(row);
 
-                // ✅ 关键修复：使用统一滚动函数，确保键盘收起或图片加载后位置正确
+                // ✅ 使用增强版滚动
                 scrollToBottom();
             }
 
@@ -860,7 +891,7 @@
                     appendMessageDOM(msg);
                 }
 
-                // ✅ 发送后立即触发滚动，确保消息可见
+                // ✅ 发送后立即触发滚动
                 scrollToBottom();
 
                 await saveMessages();
@@ -1116,13 +1147,14 @@
                     });
                 }
 
-                // ✅ 动态更新底部留白 + 顺滑防抖滚动
+                // ✅ 动态更新底部留白
                 function updateChatPadding() {
                     const inputBarHeight = inputBar.offsetHeight;
                     chatArea.style.paddingBottom = (inputBarHeight + 20) + 'px';
                 }
                 updateChatPadding();
 
+                // ---------- 键盘与滚动事件优化 ----------
                 let resizeTimer = null;
                 let prevInnerHeight = window.innerHeight;
                 window.addEventListener('resize', function() {
@@ -1136,26 +1168,30 @@
                     prevInnerHeight = window.innerHeight;
                 });
 
-                // ✅ 【关键修复】移动端键盘收起时，增加深度防抖和延时滚动
+                // ✅ 增强 visualViewport 处理
                 if (window.visualViewport) {
                     let viewportTimer = null;
                     let prevViewportHeight = window.visualViewport.height;
                     window.visualViewport.addEventListener('resize', function() {
                         clearTimeout(viewportTimer);
                         const currentHeight = window.visualViewport.height;
-                        
-                        // 当视口高度变大（说明键盘正在收起）时，触发延迟滚动
                         if (currentHeight > prevViewportHeight) {
                             viewportTimer = setTimeout(() => {
-                                // 1. 先更新底部留白
-                                updateChatPadding(); 
-                                // 2. 使用统一函数滚动到底部
+                                updateChatPadding();
                                 scrollToBottom();
-                            }, 300); // 延迟 300ms，等待输入栏动画彻底结束
+                            }, 150); // 缩短延迟，更快响应
                         }
                         prevViewportHeight = currentHeight;
                     });
                 }
+
+                // ✅ 输入框 focus/blur 时强制滚动
+                msgInput.addEventListener('focus', function() {
+                    setTimeout(scrollToBottom, 200);
+                });
+                msgInput.addEventListener('blur', function() {
+                    setTimeout(scrollToBottom, 300);
+                });
 
                 // 挂载按钮事件
                 sendBtn.addEventListener('click', function() {
