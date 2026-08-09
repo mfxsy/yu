@@ -432,10 +432,10 @@
     </script>
 
     <!-- =============================================================
-    主程序（增强兼容版）
+    主程序（增强兼容版，专为 Edge 优化滚动）
     修复点：
     1. 导航栏固定：强制 z-index 和 transform
-    2. 滚动机制：移除平滑滚动，使用多重强制滚动
+    2. 滚动机制：移除平滑滚动，使用 scrollIntoView + 多层延时强制滚动
     3. 键盘事件：监听 focus/blur，增强 visualViewport 响应
     ============================================================= -->
     <script>
@@ -635,27 +635,44 @@
             }
             window.saveMessages = saveMessages;
 
-            // ---------- 增强版统一滚动到底部 ----------
+            // ---------- 增强版统一滚动到底部（专为 Edge 优化） ----------
             function scrollToBottom() {
                 if (!chatArea) return;
-                // 立即强制滚动
+                // 1. 立即强制滚动
                 chatArea.scrollTop = chatArea.scrollHeight;
-                // 1帧后再次强制
+                // 2. 使用 scrollIntoView 强制将最后一个消息元素滚动到可视区底部（更可靠）
+                const lastMsg = chatArea.lastElementChild;
+                if (lastMsg) {
+                    lastMsg.scrollIntoView({ behavior: 'auto', block: 'end' });
+                }
+                // 3. requestAnimationFrame 后再次设置 scrollTop
                 requestAnimationFrame(() => {
                     chatArea.scrollTop = chatArea.scrollHeight;
+                    if (lastMsg) {
+                        lastMsg.scrollIntoView({ behavior: 'auto', block: 'end' });
+                    }
                 });
-                // 50ms后
+                // 4. 延时 100ms 后再强制（Edge 可能需要更长时间布局）
                 setTimeout(() => {
                     chatArea.scrollTop = chatArea.scrollHeight;
-                }, 50);
-                // 150ms后（图片加载完成）
+                    if (lastMsg) {
+                        lastMsg.scrollIntoView({ behavior: 'auto', block: 'end' });
+                    }
+                }, 100);
+                // 5. 延时 300ms 确保键盘完全收起后再次触底
                 setTimeout(() => {
                     chatArea.scrollTop = chatArea.scrollHeight;
-                }, 150);
-                // 300ms后（键盘完全收起）
-                setTimeout(() => {
-                    chatArea.scrollTop = chatArea.scrollHeight;
+                    if (lastMsg) {
+                        lastMsg.scrollIntoView({ behavior: 'auto', block: 'end' });
+                    }
                 }, 300);
+                // 6. 额外延时 500ms（Edge 特别需要）
+                setTimeout(() => {
+                    chatArea.scrollTop = chatArea.scrollHeight;
+                    if (lastMsg) {
+                        lastMsg.scrollIntoView({ behavior: 'auto', block: 'end' });
+                    }
+                }, 500);
             }
 
             // ---------- 渲染消息（全量构建，用于页面初始加载） ----------
@@ -891,8 +908,12 @@
                     appendMessageDOM(msg);
                 }
 
-                // ✅ 发送后立即触发滚动
+                // ✅ 发送后立即触发滚动，并额外使用多重延时（确保 Edge 可见）
                 scrollToBottom();
+                setTimeout(scrollToBottom, 50);
+                setTimeout(scrollToBottom, 150);
+                setTimeout(scrollToBottom, 300);
+                setTimeout(scrollToBottom, 500);
 
                 await saveMessages();
 
@@ -1178,7 +1199,13 @@
                         if (currentHeight > prevViewportHeight) {
                             viewportTimer = setTimeout(() => {
                                 updateChatPadding();
-                                scrollToBottom();
+                                // 快速滚动一次
+                                chatArea.scrollTop = chatArea.scrollHeight;
+                                // 再延时多次滚动
+                                setTimeout(scrollToBottom, 50);
+                                setTimeout(scrollToBottom, 150);
+                                setTimeout(scrollToBottom, 300);
+                                setTimeout(scrollToBottom, 500);
                             }, 150); // 缩短延迟，更快响应
                         }
                         prevViewportHeight = currentHeight;
@@ -1190,7 +1217,10 @@
                     setTimeout(scrollToBottom, 200);
                 });
                 msgInput.addEventListener('blur', function() {
+                    // 键盘收起后立即滚动
+                    setTimeout(scrollToBottom, 150);
                     setTimeout(scrollToBottom, 300);
+                    setTimeout(scrollToBottom, 500);
                 });
 
                 // 挂载按钮事件
