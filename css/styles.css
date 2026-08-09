@@ -271,7 +271,7 @@ body.with-background .chat-area {
     content: '';
     position: absolute;
     top: 14px;                  /* 与气泡内部顶部内边距对齐 */
-    right: -5px;                /* 等于border-width，紧贴边缘 */
+    right: -4px;                /* 等于border-width，紧贴边缘 */
     border: 6px solid transparent;
     border-left-color: var(--wechat-bubble-sent);
     border-right: 0;
@@ -282,7 +282,7 @@ body.with-background .chat-area {
     content: '';
     position: absolute;
     top: 14px;
-    left: -5px;
+    left: -4px;
     border: 6px solid transparent;
     border-right-color: var(--wechat-bubble-recv);
     border-left: 0;
