@@ -1200,14 +1200,7 @@ function markAllMyMessagesAsRead() {
                     });
                 }
 
-                // ✅ 输入框 blur 时滚动（键盘收起时触发）
-                msgInput.addEventListener('blur', function() {
-                    // 先让浏览器完成键盘动画，再更新布局和滚动
-                    setTimeout(() => {
-                        updateChatPadding();
-                        scrollToBottom();
-                    }, 150);
-                });
+                
 
                 // 挂载按钮事件
                 sendBtn.addEventListener('click', function() {
