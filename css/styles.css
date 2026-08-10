@@ -375,7 +375,7 @@ body.with-background .chat-area {
 /* ★ 在 styles.css 任意位置新增以下代码 */
 #quoteBar {
     position: absolute;
-    bottom: calc(100% + 4px); /* 悬挂在输入栏顶部之上 */
+    bottom: 100%;  /* 悬挂在输入栏顶部之上 */
     left: 0;
     right: 0;
     width: 100%;
