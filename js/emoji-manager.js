@@ -2,7 +2,7 @@
 (function() {
     'use strict';
 
-    const MAX_EMOJIS = 300;
+    const MAX_EMOJIS = 200;
     let myEmojis = [];
     let partnerEmojis = [];
     let currentTab = 'my';
@@ -45,7 +45,7 @@
         if (!Array.isArray(imageDataUrls) || imageDataUrls.length === 0) return 0;
         const available = maxLimit - targetArray.length;
         if (available <= 0) return 0;
-        const toAdd = imageDataUrls.slice(0, Math.min(available, 20));
+        const toAdd = imageDataUrls.slice(0, Math.min(available, 50));
         const added = [];
         for (const url of toAdd) {
             if (targetArray.length < maxLimit) {
@@ -158,18 +158,45 @@
                         return;
                     }
                     const reader = new FileReader();
-                    reader.onload = function(ev) {
-                        const dataUrl = ev.target.result;
-                        if (typeof window.sendMessage === 'function') {
-                            window.sendMessage('', dataUrl);
-                            showToast('图片已发送', 'success');
-                            // 发送后自动关闭面板
-                            const panel = document.getElementById('emojiPanel');
-                            if (panel) panel.classList.remove('open');
-                        } else {
-                            showToast('发送失败', 'error');
-                        }
-                    };
+
+
+                     reader.onload = function(ev) {
+                const img = new Image();
+                img.onload = function() {
+                    // 1. 创建 Canvas 进行压缩
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // 2. 设置最大宽度（和背景一样：1000px）
+                    let width = img.width;
+                    let height = img.height;
+                    const MAX_WIDTH = 1000;
+                    if (width > MAX_WIDTH) {
+                        height = (MAX_WIDTH / width) * height;
+                        width = MAX_WIDTH;
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // 3. 转为 JPEG 格式，质量 0.85
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                    
+                    // 4. 发送压缩后的图片
+                    if (typeof window.sendMessage === 'function') {
+                        window.sendMessage('', compressedDataUrl);
+                        showToast('图片已发送（已压缩）', 'success');
+                        const panel = document.getElementById('emojiPanel');
+                        if (panel) panel.classList.remove('open');
+                    } else {
+                        showToast('发送失败', 'error');
+                    }
+                };
+                img.src = ev.target.result; // 开始加载原始图片数据
+            };
+
+
                     reader.readAsDataURL(file);
                 };
                 input.click();
