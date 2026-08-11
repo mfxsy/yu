@@ -2,7 +2,7 @@
 (function() {
     'use strict';
 
-    const MAX_EMOJIS = 100;
+    const MAX_EMOJIS = 300;
     let myEmojis = [];
     let partnerEmojis = [];
     let currentTab = 'my';
@@ -91,12 +91,12 @@
             input.onchange = async function(e) {
                 const files = Array.from(e.target.files);
                 if (files.length === 0) return;
-                if (files.length > 20) {
-                    showToast('单次最多选择20张', 'error');
+                if (files.length > 50) {
+                    showToast('单次最多选择50张', 'error');
                     input.value = '';
                     return;
                 }
-                const oversized = files.filter(f => f.size > 2 * 1024 * 1024);
+                const oversized = files.filter(f => f.size > 5 * 1024 * 1024);
                 if (oversized.length) {
                     showToast('部分图片超过5MB，请压缩', 'error');
                     input.value = '';
@@ -153,8 +153,8 @@
                 input.onchange = function(e) {
                     const file = e.target.files[0];
                     if (!file) return;
-                    if (file.size > 2 * 1024 * 1024) {
-                        showToast('图片不能超过5MB', 'error');
+                    if (file.size > 10 * 1024 * 1024) {
+                        showToast('图片不能超过10MB', 'error');
                         return;
                     }
                     const reader = new FileReader();

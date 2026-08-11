@@ -59,7 +59,7 @@
         },
         applyBg: function() {
             if (chatBg) {
-                document.documentElement.style.setProperty('--chat-bg-image', `url(${chatBg})`);
+                document.documentElement.style.setProperty('--chat-bg-image', 'url("' + chatBg + '")');
                 document.body.classList.add('with-background');
             } else {
                 document.documentElement.style.removeProperty('--chat-bg-image');
@@ -153,7 +153,7 @@
                 input.onchange = function(e) {
                     const file = e.target.files[0];
                     if (!file) return;
-                    if (file.size > 2 * 1024 * 1024) {
+                    if (file.size > 10 * 1024 * 1024) {
                         showToast('图片不能超过10MB', 'error');
                         return;
                     }
@@ -189,28 +189,56 @@
             });
         });
 
+
         container.querySelector('.bg-upload-btn')?.addEventListener('click', function() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'image/*';
-            input.onchange = function(e) {
-                const file = e.target.files[0];
-                if (!file) return;
-                if (file.size > 2 * 1024 * 1024) {
-                    showToast('图片不能超过10MB', 'error');
-                    return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        // 这里保持你之前改好的 10MB 限制
+        if (file.size > 10 * 1024 * 1024) { 
+            showToast('图片不能超过10MB，请压缩后重试', 'error');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            const img = new Image();
+            img.onload = function() {
+                // 创建 Canvas 进行压缩
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // 如果图片宽度大于 1000px，则等比例缩放到 1000px
+                // (这个尺寸做手机壁纸足够了，而且能大幅缩短 Base64 长度)
+                let width = img.width;
+                let height = img.height;
+                const MAX_WIDTH = 1000;
+                if (width > MAX_WIDTH) {
+                    height = (MAX_WIDTH / width) * height;
+                    width = MAX_WIDTH;
                 }
-                const reader = new FileReader();
-                reader.onload = function(ev) {
-                    const dataUrl = ev.target.result;
-                    window.avatarManager.setChatBg(dataUrl);
-                    renderPanel();
-                    showToast('背景已更新', 'success');
-                };
-                reader.readAsDataURL(file);
+                
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                // 转为 JPEG 格式，质量 0.85（肉眼几乎看不出和原图差别，但体积小很多）
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                
+                // ★ 这里用的是 setChatBg，数据会永久存入 localforage，刷新绝对不丢 ★
+                window.avatarManager.setChatBg(compressedDataUrl);
+                renderPanel();
+                showToast('背景已更新', 'success');
             };
-            input.click();
-        });
+            img.src = ev.target.result; // 开始加载原始图片数据
+        };
+        reader.readAsDataURL(file);
+    };
+    input.click();
+});
+
 
         container.querySelector('.bg-remove-btn')?.addEventListener('click', function() {
             window.avatarManager.removeChatBg();

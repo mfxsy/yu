@@ -170,7 +170,7 @@ body.with-background .chat-area {
     flex-direction: column;
     gap: 4px;
     scroll-behavior: smooth;
-    background: var(--wechat-bg);
+    background-color: var(--wechat-bg);
 }
 
 .chat-area::-webkit-scrollbar {
