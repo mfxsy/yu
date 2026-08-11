@@ -178,6 +178,7 @@ body.with-background .chat-area {
     display: none;
 }
 
+
 .msg-timestamp {
     text-align: center;
     font-size: 11px;
@@ -186,6 +187,7 @@ body.with-background .chat-area {
     opacity: 0.7;
     letter-spacing: 0.3px;
 }
+
 .msg-row {
     display: flex;
     align-items: flex-start;
@@ -988,3 +990,13 @@ body.with-background .empty-state {
 }
 
 
+/* 只在应用了自定义背景时生效 - 增强深色背景下的文字清晰度 */
+body.with-background .msg-timestamp,
+body.with-background .msg-meta {
+    color: #ffffff !important;
+    opacity: 1 !important; /* 去除原本的透明度 */
+    text-shadow: 0 0 2px #000, 0 0 4px #000, 0 1px 6px #000; /* 黑色发光描边 */
+}
+body.with-background .msg-meta .read-status.read {
+    color: #b3ffb3 !important; /* 已读回执图标提亮 */
+}
