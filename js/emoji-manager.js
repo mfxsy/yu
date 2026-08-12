@@ -45,6 +45,7 @@
         if (!Array.isArray(imageDataUrls) || imageDataUrls.length === 0) return 0;
         const available = maxLimit - targetArray.length;
         if (available <= 0) return 0;
+        // 硬编码单次最多处理 50 张
         const toAdd = imageDataUrls.slice(0, Math.min(available, 50));
         const added = [];
         for (const url of toAdd) {
@@ -140,7 +141,7 @@
         });
         topBtnContainer.appendChild(addBtn);
 
-        // 只有“我方”标签页显示“发送图片”按钮
+        // ===== 只有“我方”标签页显示“发送图片”按钮（此处已修改为压缩发送） =====
         if (currentTab === 'my') {
             const sendBtn = document.createElement('button');
             sendBtn.textContent = '发送图片';
@@ -158,45 +159,43 @@
                         return;
                     }
                     const reader = new FileReader();
-
-
-                     reader.onload = function(ev) {
-                const img = new Image();
-                img.onload = function() {
-                    // 1. 创建 Canvas 进行压缩
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    
-                    // 2. 设置最大宽度（和背景一样：1000px）
-                    let width = img.width;
-                    let height = img.height;
-                    const MAX_WIDTH = 1000;
-                    if (width > MAX_WIDTH) {
-                        height = (MAX_WIDTH / width) * height;
-                        width = MAX_WIDTH;
-                    }
-                    
-                    canvas.width = width;
-                    canvas.height = height;
-                    ctx.drawImage(img, 0, 0, width, height);
-                    
-                    // 3. 转为 JPEG 格式，质量 0.85
-                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                    
-                    // 4. 发送压缩后的图片
-                    if (typeof window.sendMessage === 'function') {
-                        window.sendMessage('', compressedDataUrl);
-                        showToast('图片已发送（已压缩）', 'success');
-                        const panel = document.getElementById('emojiPanel');
-                        if (panel) panel.classList.remove('open');
-                    } else {
-                        showToast('发送失败', 'error');
-                    }
-                };
-                img.src = ev.target.result; // 开始加载原始图片数据
-            };
-
-
+                    // 👇 修改部分：加入 Canvas 压缩逻辑
+                    reader.onload = function(ev) {
+                        const img = new Image();
+                        img.onload = function() {
+                            // 1. 创建 Canvas 进行压缩
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            
+                            // 2. 设置最大宽度（和背景一样：1000px）
+                            let width = img.width;
+                            let height = img.height;
+                            const MAX_WIDTH = 1000;
+                            if (width > MAX_WIDTH) {
+                                height = (MAX_WIDTH / width) * height;
+                                width = MAX_WIDTH;
+                            }
+                            
+                            canvas.width = width;
+                            canvas.height = height;
+                            ctx.drawImage(img, 0, 0, width, height);
+                            
+                            // 3. 转为 JPEG 格式，质量 0.85
+                            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                            
+                            // 4. 发送压缩后的图片
+                            if (typeof window.sendMessage === 'function') {
+                                window.sendMessage('', compressedDataUrl);
+                                showToast('图片已发送（已压缩）', 'success');
+                                const panel = document.getElementById('emojiPanel');
+                                if (panel) panel.classList.remove('open');
+                            } else {
+                                showToast('发送失败', 'error');
+                            }
+                        };
+                        img.src = ev.target.result; // 开始加载原始图片数据
+                    };
+                    // 👆 修改结束
                     reader.readAsDataURL(file);
                 };
                 input.click();
@@ -392,5 +391,5 @@
         });
     });
 
-    console.log('✅ 表情包模块已加载（等待 SESSION_ID 就绪后 reload）');
+    console.log('✅ 表情包模块已加载（发送图片已加入压缩逻辑）');
 })();

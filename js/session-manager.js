@@ -20,9 +20,14 @@
     }
 
     async function saveSessionList() {
-        await localforage.setItem(APP_PREFIX + 'sessionList', sessionList);
+        try {
+            await localforage.setItem(APP_PREFIX + 'sessionList', sessionList);
+        } catch (e) {
+            console.warn('保存会话列表失败', e);
+        }
     }
 
+    // ★ 修改点3：createNewSession 加上 try-catch，保存失败时只输出警告，不崩
     async function createNewSession(name) {
         const id = Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
         const newSession = {
@@ -31,7 +36,11 @@
             createdAt: Date.now()
         };
         sessionList.push(newSession);
-        await saveSessionList();
+        try {
+            await saveSessionList();
+        } catch (e) {
+            console.warn('保存新会话失败，仅内存有效', e);
+        }
         return id;
     }
 
@@ -39,44 +48,55 @@
         /**
          * 初始化会话：
          * 1. 若 URL Hash 存在且有效 → 使用该会话
-         * 2. 否则，尝试恢复 lastSessionId（跨刷新保留）
+         * 2. 否则，尝试恢复 lastSessionId
          * 3. 否则，取会话列表中的第一个
          * 4. 否则，创建全新会话
          */
+        // ★ 修改点2：initializeSession 整体套上 try-catch，最外层生成临时ID
         async initializeSession() {
-            await loadSessionList();
+            // 加载列表时即使失败也不抛出
+            try {
+                await loadSessionList();
+            } catch (e) {
+                console.warn('加载会话列表失败', e);
+                sessionList = [];
+            }
 
-            // 1) URL Hash（只读，不写入）
-            const hash = window.location.hash.substring(1);
-            if (hash && sessionList.some(s => s.id === hash)) {
-                currentSessionId = hash;
-                // ★ 已删除 history.replaceState，避免触发浏览器历史冲突
+            try {
+                // 1) URL Hash
+                const hash = window.location.hash.substring(1);
+                if (hash && sessionList.some(s => s.id === hash)) {
+                    currentSessionId = hash;
+                    await localforage.setItem(APP_PREFIX + 'lastSessionId', currentSessionId);
+                    return currentSessionId;
+                }
+
+                // 2) lastSessionId
+                const lastId = await localforage.getItem(APP_PREFIX + 'lastSessionId');
+                if (lastId && sessionList.some(s => s.id === lastId)) {
+                    currentSessionId = lastId;
+                    await localforage.setItem(APP_PREFIX + 'lastSessionId', currentSessionId);
+                    return currentSessionId;
+                }
+
+                // 3) 取第一个会话
+                if (sessionList.length > 0) {
+                    currentSessionId = sessionList[0].id;
+                    await localforage.setItem(APP_PREFIX + 'lastSessionId', currentSessionId);
+                    return currentSessionId;
+                }
+
+                // 4) 完全无会话 → 新建
+                const newId = await createNewSession('我的会话');
+                currentSessionId = newId;
                 await localforage.setItem(APP_PREFIX + 'lastSessionId', currentSessionId);
                 return currentSessionId;
-            }
-
-            // 2) lastSessionId（刷新时恢复）
-            const lastId = await localforage.getItem(APP_PREFIX + 'lastSessionId');
-            if (lastId && sessionList.some(s => s.id === lastId)) {
-                currentSessionId = lastId;
-                // ★ 已删除 history.replaceState
+            } catch (e) {
+                // ★ 如果上面所有步骤都失败，生成一个临时内存ID，保证应用不崩，也不写进URL
+                console.error('[会话] 严重初始化错误，生成临时会话', e);
+                currentSessionId = 'temp_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 4);
                 return currentSessionId;
             }
-
-            // 3) 取第一个会话
-            if (sessionList.length > 0) {
-                currentSessionId = sessionList[0].id;
-                // ★ 已删除 history.replaceState
-                await localforage.setItem(APP_PREFIX + 'lastSessionId', currentSessionId);
-                return currentSessionId;
-            }
-
-            // 4) 完全无会话 → 新建
-            const newId = await createNewSession('我的会话');
-            currentSessionId = newId;
-            // ★ 已删除 history.replaceState (和重置 hash 的操作)
-            await localforage.setItem(APP_PREFIX + 'lastSessionId', currentSessionId);
-            return currentSessionId;
         },
 
         // 切换会话

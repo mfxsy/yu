@@ -995,8 +995,4 @@ body.with-background .msg-timestamp,
 body.with-background .msg-meta {
     color: #ffffff !important;
     opacity: 1 !important; /* 去除原本的透明度 */
-    text-shadow: 0 0 2px #000, 0 0 4px #000, 0 1px 6px #000; /* 黑色发光描边 */
-}
-body.with-background .msg-meta .read-status.read {
-    color: #b3ffb3 !important; /* 已读回执图标提亮 */
 }

@@ -499,11 +499,17 @@
             }
             window.showToast = showToast;
 
+
             // ---------- 存储键 ----------
-            function getStorageKey(baseKey) {
-                if (!window.SESSION_ID) throw new Error('SESSION_ID not initialized');
-                return window.APP_PREFIX + window.SESSION_ID + '_' + baseKey;
-            }
+           function getStorageKey(baseKey) {
+    if (!window.SESSION_ID) {
+        console.warn('[存储] SESSION_ID未初始化，使用临时存储键');
+        return window.APP_PREFIX + 'temp_' + baseKey;
+    }
+    return window.APP_PREFIX + window.SESSION_ID + '_' + baseKey;
+}
+
+
             window.getStorageKey = getStorageKey;
 
             // ---------- 通知设置 ----------
