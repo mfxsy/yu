@@ -162,27 +162,60 @@ function setupEventListeners() {
         });
     }
 
-    // ★ 移除旧的长按初始化，改为单击初始化
-    if (window.quoteManager) {
-        window.quoteManager.initClickQuote(DOM.chatArea);
-    }
-
-    // ★ 单击气泡弹出引用按钮（替代长按）
+    // =========================================================================
+    // ★★★ 核心修复：改用 click 事件自定义判断双击（解决移动端/触控板双击不触发问题） ★★★
+    // =========================================================================
     if (DOM.chatArea) {
+        // 初始化双击模式（兼容旧方法）
+        if (window.quoteManager) {
+            window.quoteManager.initDoubleClickQuote(DOM.chatArea);
+        }
+
+        let clickTimer = null;
+        let lastClickTime = 0;
+        const DOUBLE_CLICK_DELAY = 300; // 两次点击的间隔小于 300ms 视为双击
+
         DOM.chatArea.addEventListener('click', function(e) {
             const bubble = e.target.closest('.msg-bubble');
-            if (!bubble) return;
-            // 点击图片本身则继续触发查看大图，不干扰
-            if (e.target.tagName === 'IMG') return;
+            // 保证点击查看大图功能不受影响：点击到图片标签时直接返回
+            if (!bubble || e.target.tagName === 'IMG') {
+                return;
+            }
 
-            const row = bubble.closest('.msg-row');
-            if (!row) return;
+            const now = Date.now();
+            const timeSinceLastClick = now - lastClickTime;
 
-            if (window.quoteManager && window.quoteManager.getEnabled()) {
-                window.quoteManager.showQuoteButton(row);
+            if (timeSinceLastClick < DOUBLE_CLICK_DELAY) {
+                // 检测到双击动作！
+                clearTimeout(clickTimer);
+                clickTimer = null;
+                lastClickTime = 0; // 重置状态
+
+                const row = bubble.closest('.msg-row');
+                if (!row) return;
+
+                if (window.quoteManager && window.quoteManager.getEnabled()) {
+                    const msgId = row.dataset.msgId;
+                    const msg = window.messages.find(m => String(m.id) === String(msgId));
+                    if (msg) {
+                        console.log('[调试] 自定义双击检测成功，触发引用:', msg);
+                        window.quoteManager.showQuote(msg);
+                        if (DOM.msgInput) DOM.msgInput.focus();
+                    }
+                }
+            } else {
+                // 这是间隔超过 300ms 的第一次点击
+                lastClickTime = now;
+                clearTimeout(clickTimer);
+                // 设置定时器，如果在 300ms 内没有第二次点击，则重置状态
+                clickTimer = setTimeout(() => {
+                    lastClickTime = 0;
+                    clickTimer = null;
+                }, DOUBLE_CLICK_DELAY);
             }
         });
     }
+    // =========================================================================
 
     // --- 表情按钮 ---
     if (DOM.emojiBtn) {
@@ -273,7 +306,7 @@ function setupEventListeners() {
         }
     });
 
-    // --- 点击消息区域查看图片 ---
+    // --- 单击查看大图（保持不变） ---
     window._viewImage = function(src) {
         const overlay = document.createElement('div');
         overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;cursor:pointer;animation:fadeIn 0.2s ease;';

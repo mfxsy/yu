@@ -53,71 +53,10 @@
 
     function getEnabled() { return isQuoteEnabled; }
 
-    // ---------- 单击触发引用（取代旧的长按） ----------
-    function initClickQuote(container) {
+    // ---------- 双击触发引用（取代之前的单击按钮） ----------
+    function initDoubleClickQuote(container) {
         chatArea = container;
         // 事件监听由 listeners.js 统一处理
-    }
-
-    // ---------- 显示引用按钮（纯图标，尺寸同底部按钮） ----------
-    function showQuoteButton(row) {
-        // 移除之前可能残留的按钮
-        const oldBtn = document.querySelector('.quote-action-btn');
-        if (oldBtn) oldBtn.remove();
-
-        const msgId = row.dataset.msgId;
-        const msg = window.messages.find(m => String(m.id) === String(msgId));
-        if (!msg) return;
-
-        const bubble = row.querySelector('.msg-bubble');
-        if (!bubble) return;
-
-        const rect = bubble.getBoundingClientRect();
-        const isSent = row.classList.contains('sent');
-
-        const btn = document.createElement('button');
-        btn.className = 'quote-action-btn';
-        btn.innerHTML = '<i class="fas fa-reply"></i>';
-        const size = 20; // 与底部 btn-icon 尺寸一致
-        btn.style.cssText = `
-            position: fixed;
-            z-index: 999;
-            width: ${size}px; height: ${size}px;
-            border-radius: 50%;
-            border: none;
-            background: var(--wechat-green);
-            color: #fff;
-            font-size: 10px;
-            cursor: pointer;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: transform 0.15s;
-            top: ${rect.top + rect.height/2 - size/2}px;
-            ${isSent ? `left: ${rect.left - size - 10}px;` : `left: ${rect.right + 10}px;`}
-        `;
-        document.body.appendChild(btn);
-
-        // 点击按钮触发引用，并清理
-        const removeHandler = function(e) {
-            if (!e.target.closest('.quote-action-btn')) {
-                const btnEl = document.querySelector('.quote-action-btn');
-                if (btnEl) btnEl.remove();
-                document.removeEventListener('click', removeHandler);
-            }
-        };
-        btn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            document.removeEventListener('click', removeHandler);
-            this.remove();
-            showQuote(msg);
-        });
-
-        // 延迟挂载点击外部清理，避免触发当前点击
-        setTimeout(() => {
-            document.addEventListener('click', removeHandler);
-        }, 0);
     }
 
     // ---------- 显示引用UI（顶部预览栏） ----------
@@ -182,13 +121,12 @@
     window.quoteManager = {
         getEnabled,
         setEnabled,
-        initClickQuote,      // ★ 替换原有的 initLongPress
-        showQuoteButton,     // ★ 新增：显示气泡旁的引用按钮
-        showQuote,
+        initDoubleClickQuote,  // 改为双击初始化
+        showQuote,            // 直接暴露引用触发方法
         clearQuote,
         getQuotedMessage,
         loadSettings,
     };
 
-    console.log('✅ quoteManager 已加载，改为单击+按钮触发模式');
+    console.log('✅ quoteManager 已加载，改为双击直接触发引用');
 })();
