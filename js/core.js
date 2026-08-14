@@ -140,8 +140,17 @@ function renderMessages() {
         let replyHtml = '';
         if (msg.replyTo) {
             let senderName = (msg.replyToSender === 'me') ? window.myName : window.partnerName;
-            const replyContent = msg.replyToText || '';
-            replyHtml = `<div class="quote-preview"><span>${senderName}：${replyContent.substring(0, 30)}${replyContent.length > 30 ? '…' : ''}</span></div>`;
+            let replyContent = '';
+            if (msg.replyToImage) {
+                replyContent = `<img src="${msg.replyToImage}" style="max-width:60px;max-height:60px;border-radius:4px;vertical-align:middle;margin-right:4px;" />`;
+                if (msg.replyToText) {
+                    replyContent += `<span style="vertical-align:middle;">${msg.replyToText}</span>`;
+                }
+            } else {
+                replyContent = msg.replyToText || '';
+                if (replyContent.length > 30) replyContent = replyContent.substring(0, 30) + '…';
+            }
+            replyHtml = `<div class="quote-preview"><span style="font-weight:500;">${senderName}：</span>${replyContent}</div>`;
         }
 
         const isImgOnly = msg.image && !msg.text;
@@ -217,8 +226,17 @@ function appendMessageDOM(msg) {
     let replyHtml = '';
     if (msg.replyTo) {
         let senderName = (msg.replyToSender === 'me') ? window.myName : window.partnerName;
-        const replyContent = msg.replyToText || '';
-        replyHtml = `<div class="quote-preview"><span>${senderName}：${replyContent.substring(0, 30)}${replyContent.length > 30 ? '…' : ''}</span></div>`;
+        let replyContent = '';
+        if (msg.replyToImage) {
+            replyContent = `<img src="${msg.replyToImage}" style="max-width:60px;max-height:60px;border-radius:4px;vertical-align:middle;margin-right:4px;" />`;
+            if (msg.replyToText) {
+                replyContent += `<span style="vertical-align:middle;">${msg.replyToText}</span>`;
+            }
+        } else {
+            replyContent = msg.replyToText || '';
+            if (replyContent.length > 30) replyContent = replyContent.substring(0, 30) + '…';
+        }
+        replyHtml = `<div class="quote-preview"><span style="font-weight:500;">${senderName}：</span>${replyContent}</div>`;
     }
 
     const isImgOnly = msg.image && !msg.text;
@@ -273,7 +291,8 @@ window.sendMessage = async function(text, image) {
     if (quoted) {
         msg.replyTo = quoted.id;
         msg.replyToSender = quoted.sender;
-        msg.replyToText = quoted.text || (quoted.image ? '[图片]' : '');
+        msg.replyToText = quoted.text || '';
+        msg.replyToImage = quoted.image || null; // ★ 添加图片引用
         if (window.quoteManager) window.quoteManager.clearQuote();
     }
 
@@ -422,12 +441,14 @@ function triggerReply(fromActive) {
             type: 'normal',
         };
 
+        // ★ 对方自动回复时，也支持引用（含图片）
         if (window.quoteManager && window.quoteManager.getEnabled() && Math.random() < 0.3) {
             const lastMyMsg = window.messages.slice().reverse().find(m => m.sender === 'me');
             if (lastMyMsg) {
                 reply.replyTo = lastMyMsg.id;
                 reply.replyToSender = lastMyMsg.sender;
-                reply.replyToText = lastMyMsg.text || (lastMyMsg.image ? '[图片]' : '');
+                reply.replyToText = lastMyMsg.text || '';
+                reply.replyToImage = lastMyMsg.image || null; // ★ 携带图片
             }
         }
 

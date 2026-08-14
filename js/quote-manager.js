@@ -5,12 +5,7 @@
     // 引用状态
     let isQuoteEnabled = false;
     let quotedMessage = null;
-    let longPressTimer = null;
-    let isLongPress = false;
-    const LONG_PRESS_DELAY = 500;
-
     let chatArea = null;
-    let msgInput = null;
 
     // ★ 使用全局安全存储与防御性键生成，并增加 localStorage 备用
     async function loadSettings() {
@@ -58,100 +53,74 @@
 
     function getEnabled() { return isQuoteEnabled; }
 
-    // ---------- 长按事件绑定 ----------
-    function initLongPress(container, inputElement) {
+    // ---------- 单击触发引用（取代旧的长按） ----------
+    function initClickQuote(container) {
         chatArea = container;
-        msgInput = inputElement;
-
-        if (!container) return;
-        container.addEventListener('touchstart', onTouchStart, { passive: true });
-        container.addEventListener('touchend', onTouchEnd, { passive: true });
-        container.addEventListener('touchmove', onTouchMove, { passive: true });
-        container.addEventListener('mousedown', onMouseDown);
-        container.addEventListener('mouseup', onMouseUp);
-        container.addEventListener('mouseleave', onMouseUp);
+        // 事件监听由 listeners.js 统一处理
     }
 
-    function getMsgRow(target) {
-        let el = target;
-        while (el && el !== chatArea) {
-            if (el.classList && el.classList.contains('msg-row')) {
-                return el;
-            }
-            el = el.parentElement;
-        }
-        return null;
-    }
+    // ---------- 显示引用按钮（纯图标，尺寸同底部按钮） ----------
+    function showQuoteButton(row) {
+        // 移除之前可能残留的按钮
+        const oldBtn = document.querySelector('.quote-action-btn');
+        if (oldBtn) oldBtn.remove();
 
-    function startLongPress(event) {
-        const target = event.target;
-        const row = getMsgRow(target);
-        if (!row) return;
-        if (target.closest('.wechat-input-bar') || target.closest('.msg-meta') || target.closest('.msg-avatar')) return;
+        const msgId = row.dataset.msgId;
+        const msg = window.messages.find(m => String(m.id) === String(msgId));
+        if (!msg) return;
 
         const bubble = row.querySelector('.msg-bubble');
         if (!bubble) return;
 
-        const ev = new CustomEvent('quote-request', { detail: { row: row } });
-        document.dispatchEvent(ev);
-    }
+        const rect = bubble.getBoundingClientRect();
+        const isSent = row.classList.contains('sent');
 
-    function onLongPressStart(event) {
-        if (!isQuoteEnabled) return;
-        if (longPressTimer) clearTimeout(longPressTimer);
-        isLongPress = false;
-        longPressTimer = setTimeout(() => {
-            isLongPress = true;
-            startLongPress(event);
-        }, LONG_PRESS_DELAY);
-    }
+        const btn = document.createElement('button');
+        btn.className = 'quote-action-btn';
+        btn.innerHTML = '<i class="fas fa-reply"></i>';
+        const size = 20; // 与底部 btn-icon 尺寸一致
+        btn.style.cssText = `
+            position: fixed;
+            z-index: 999;
+            width: ${size}px; height: ${size}px;
+            border-radius: 50%;
+            border: none;
+            background: var(--wechat-green);
+            color: #fff;
+            font-size: 10px;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.15s;
+            top: ${rect.top + rect.height/2 - size/2}px;
+            ${isSent ? `left: ${rect.left - size - 10}px;` : `left: ${rect.right + 10}px;`}
+        `;
+        document.body.appendChild(btn);
 
-    function onLongPressEnd() {
-        if (longPressTimer) {
-            clearTimeout(longPressTimer);
-            longPressTimer = null;
-        }
-    }
-
-    let touchStartX = 0, touchStartY = 0;
-    function onTouchStart(e) {
-        const touch = e.touches[0];
-        touchStartX = touch.clientX;
-        touchStartY = touch.clientY;
-        onLongPressStart(e);
-    }
-    function onTouchEnd(e) {
-        onLongPressEnd();
-        if (isLongPress) {
-            e.preventDefault();
-            isLongPress = false;
-        }
-    }
-    function onTouchMove(e) {
-        if (longPressTimer) {
-            const touch = e.touches[0];
-            const dx = touch.clientX - touchStartX;
-            const dy = touch.clientY - touchStartY;
-            if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
-                clearTimeout(longPressTimer);
-                longPressTimer = null;
+        // 点击按钮触发引用，并清理
+        const removeHandler = function(e) {
+            if (!e.target.closest('.quote-action-btn')) {
+                const btnEl = document.querySelector('.quote-action-btn');
+                if (btnEl) btnEl.remove();
+                document.removeEventListener('click', removeHandler);
             }
-        }
+        };
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            document.removeEventListener('click', removeHandler);
+            this.remove();
+            showQuote(msg);
+        });
+
+        // 延迟挂载点击外部清理，避免触发当前点击
+        setTimeout(() => {
+            document.addEventListener('click', removeHandler);
+        }, 0);
     }
 
-    function onMouseDown(e) {
-        if (e.button !== 0) return;
-        onLongPressStart(e);
-    }
-    function onMouseUp(e) {
-        onLongPressEnd();
-        if (isLongPress) {
-            isLongPress = false;
-            e.preventDefault();
-        }
-    }
-
-    // ---------- 显示引用UI ----------
+    // ---------- 显示引用UI（顶部预览栏） ----------
     function showQuote(quotedMsg) {
         if (!quotedMsg) return;
         quotedMessage = quotedMsg;
@@ -159,23 +128,34 @@
         if (!quoteBar) {
             quoteBar = document.createElement('div');
             quoteBar.id = 'quoteBar';
-            // 追加到输入栏内部
             const inputBar = document.getElementById('inputBar');
             if (inputBar) inputBar.appendChild(quoteBar); 
         }
         const sender = quotedMsg.sender === 'me' ? '我' : '对方';
-        const content = quotedMsg.text || (quotedMsg.image ? '[图片]' : '');
+        
+        // 支持图片和文字混合预览
+        let contentHtml = '';
+        if (quotedMsg.image) {
+            contentHtml = `<img src="${quotedMsg.image}" style="max-width:40px;max-height:40px;border-radius:4px;vertical-align:middle;margin-right:4px;" />`;
+            if (quotedMsg.text) contentHtml += `<span style="vertical-align:middle;">${quotedMsg.text}</span>`;
+        } else {
+            contentHtml = quotedMsg.text || '';
+        }
+
         if (quoteBar) {
             quoteBar.innerHTML = `
-                <span>${sender}：${content.substring(0, 50)}${content.length > 50 ? '…' : ''}</span>
-                <button id="clearQuoteBtn" style="background:none;border:none;color:var(--wechat-text-secondary);cursor:pointer;font-size:14px;"><i class="fas fa-times"></i></button>
+                <span style="display:flex;align-items:center;gap:4px;flex:1;overflow:hidden;">
+                    <span style="font-weight:500;flex-shrink:0;">${sender}：</span>
+                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${contentHtml}</span>
+                </span>
+                <button id="clearQuoteBtn" style="background:none;border:none;color:var(--wechat-text-secondary);cursor:pointer;font-size:14px;flex-shrink:0;"><i class="fas fa-times"></i></button>
             `;
             quoteBar.style.display = 'flex';
             document.getElementById('clearQuoteBtn').addEventListener('click', function() {
                 clearQuote();
             });
         }
-        if (msgInput) msgInput.focus();
+        if (DOM.msgInput) DOM.msgInput.focus();
 
         // 更新聊天区域底部间距
         if (typeof window.updateChatPadding === 'function') {
@@ -202,12 +182,13 @@
     window.quoteManager = {
         getEnabled,
         setEnabled,
-        initLongPress,
+        initClickQuote,      // ★ 替换原有的 initLongPress
+        showQuoteButton,     // ★ 新增：显示气泡旁的引用按钮
         showQuote,
         clearQuote,
         getQuotedMessage,
         loadSettings,
     };
 
-    console.log('✅ quoteManager 已加载，包含备用恢复机制');
+    console.log('✅ quoteManager 已加载，改为单击+按钮触发模式');
 })();

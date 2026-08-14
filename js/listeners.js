@@ -162,9 +162,26 @@ function setupEventListeners() {
         });
     }
 
-    // --- 长按引用 ---
-    if (window.quoteManager && DOM.chatArea && DOM.msgInput) {
-        window.quoteManager.initLongPress(DOM.chatArea, DOM.msgInput);
+    // ★ 移除旧的长按初始化，改为单击初始化
+    if (window.quoteManager) {
+        window.quoteManager.initClickQuote(DOM.chatArea);
+    }
+
+    // ★ 单击气泡弹出引用按钮（替代长按）
+    if (DOM.chatArea) {
+        DOM.chatArea.addEventListener('click', function(e) {
+            const bubble = e.target.closest('.msg-bubble');
+            if (!bubble) return;
+            // 点击图片本身则继续触发查看大图，不干扰
+            if (e.target.tagName === 'IMG') return;
+
+            const row = bubble.closest('.msg-row');
+            if (!row) return;
+
+            if (window.quoteManager && window.quoteManager.getEnabled()) {
+                window.quoteManager.showQuoteButton(row);
+            }
+        });
     }
 
     // --- 表情按钮 ---
