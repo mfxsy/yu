@@ -8,15 +8,12 @@
     let currentTab = 'my';
 
     function getKey() {
-        if (typeof window.getStorageKey === 'function') {
-            return window.getStorageKey('emojiData');
-        }
-        return 'CHAT_APP_V3_emojiData';
+        return window.getStorageKey('emojiData');
     }
 
     async function loadData() {
         try {
-            const data = await localforage.getItem(getKey());
+            const data = await safeGetItem(getKey());
             if (data) {
                 if (data.myEmojis) myEmojis = data.myEmojis;
                 if (data.partnerEmojis) partnerEmojis = data.partnerEmojis;
@@ -35,7 +32,7 @@
 
     async function saveData() {
         try {
-            await localforage.setItem(getKey(), { myEmojis, partnerEmojis });
+            await safeSetItem(getKey(), { myEmojis, partnerEmojis });
         } catch (e) {
             console.warn('保存表情数据失败:', e);
         }
@@ -45,7 +42,6 @@
         if (!Array.isArray(imageDataUrls) || imageDataUrls.length === 0) return 0;
         const available = maxLimit - targetArray.length;
         if (available <= 0) return 0;
-        // 硬编码单次最多处理 50 张
         const toAdd = imageDataUrls.slice(0, Math.min(available, 50));
         const added = [];
         for (const url of toAdd) {
@@ -74,11 +70,9 @@
 
         container.innerHTML = '';
 
-        // ===== 顶部按钮区域（移到最上方） =====
         const topBtnContainer = document.createElement('div');
         topBtnContainer.style.cssText = 'display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;';
 
-        // 添加表情按钮（双方通用）
         const addBtn = document.createElement('button');
         addBtn.textContent = '添加表情（可多选）';
         addBtn.style.cssText = 'flex:1;padding:10px;background:var(--wechat-green);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;';
@@ -87,32 +81,32 @@
             input.type = 'file';
             input.accept = 'image/*';
             input.multiple = true;
-            showToast('请在相册中多选图片（长按或点右上角选择）', 'info');
+            window.showToast('请在相册中多选图片（长按或点右上角选择）', 'info');
             
             input.onchange = async function(e) {
                 const files = Array.from(e.target.files);
                 if (files.length === 0) return;
                 if (files.length > 50) {
-                    showToast('单次最多选择50张', 'error');
+                    window.showToast('单次最多选择50张', 'error');
                     input.value = '';
                     return;
                 }
                 const oversized = files.filter(f => f.size > 5 * 1024 * 1024);
                 if (oversized.length) {
-                    showToast('部分图片超过5MB，请压缩', 'error');
+                    window.showToast('部分图片超过5MB，请压缩', 'error');
                     input.value = '';
                     return;
                 }
                 const targetArray = currentTab === 'my' ? myEmojis : partnerEmojis;
                 const available = MAX_EMOJIS - targetArray.length;
                 if (available <= 0) {
-                    showToast((currentTab === 'my' ? '我方' : '对方') + '表情已达上限(' + MAX_EMOJIS + '个)', 'error');
+                    window.showToast((currentTab === 'my' ? '我方' : '对方') + '表情已达上限(' + MAX_EMOJIS + '个)', 'error');
                     input.value = '';
                     return;
                 }
                 const toLoad = Math.min(files.length, available);
                 if (toLoad < files.length) {
-                    showToast('仅可添加 ' + toLoad + ' 张（达到上限）', 'warning');
+                    window.showToast('仅可添加 ' + toLoad + ' 张（达到上限）', 'warning');
                 }
                 const dataUrls = await Promise.all(
                     Array.from(files).slice(0, toLoad).map(function(file) {
@@ -131,9 +125,9 @@
                 }
                 if (added > 0) {
                     renderPanel();
-                    showToast('成功添加 ' + added + ' 张表情', 'success');
+                    window.showToast('成功添加 ' + added + ' 张表情', 'success');
                 } else {
-                    showToast('添加失败或已达上限', 'error');
+                    window.showToast('添加失败或已达上限', 'error');
                 }
                 input.value = '';
             };
@@ -141,7 +135,6 @@
         });
         topBtnContainer.appendChild(addBtn);
 
-        // ===== 只有“我方”标签页显示“发送图片”按钮（此处已修改为压缩发送） =====
         if (currentTab === 'my') {
             const sendBtn = document.createElement('button');
             sendBtn.textContent = '发送图片';
@@ -155,19 +148,15 @@
                     const file = e.target.files[0];
                     if (!file) return;
                     if (file.size > 10 * 1024 * 1024) {
-                        showToast('图片不能超过10MB', 'error');
+                        window.showToast('图片不能超过10MB', 'error');
                         return;
                     }
                     const reader = new FileReader();
-                    // 👇 修改部分：加入 Canvas 压缩逻辑
                     reader.onload = function(ev) {
                         const img = new Image();
                         img.onload = function() {
-                            // 1. 创建 Canvas 进行压缩
                             const canvas = document.createElement('canvas');
                             const ctx = canvas.getContext('2d');
-                            
-                            // 2. 设置最大宽度（和背景一样：1000px）
                             let width = img.width;
                             let height = img.height;
                             const MAX_WIDTH = 1000;
@@ -175,27 +164,21 @@
                                 height = (MAX_WIDTH / width) * height;
                                 width = MAX_WIDTH;
                             }
-                            
                             canvas.width = width;
                             canvas.height = height;
                             ctx.drawImage(img, 0, 0, width, height);
-                            
-                            // 3. 转为 JPEG 格式，质量 0.85
                             const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                            
-                            // 4. 发送压缩后的图片
                             if (typeof window.sendMessage === 'function') {
                                 window.sendMessage('', compressedDataUrl);
-                                showToast('图片已发送（已压缩）', 'success');
+                                window.showToast('图片已发送（已压缩）', 'success');
                                 const panel = document.getElementById('emojiPanel');
                                 if (panel) panel.classList.remove('open');
                             } else {
-                                showToast('发送失败', 'error');
+                                window.showToast('发送失败', 'error');
                             }
                         };
-                        img.src = ev.target.result; // 开始加载原始图片数据
+                        img.src = ev.target.result;
                     };
-                    // 👆 修改结束
                     reader.readAsDataURL(file);
                 };
                 input.click();
@@ -205,7 +188,6 @@
 
         container.appendChild(topBtnContainer);
 
-        // ===== 内容区域（网格或空状态） =====
         if (emojis.length === 0) {
             const emptyDiv = document.createElement('div');
             emptyDiv.className = 'card-empty';
@@ -237,7 +219,7 @@
                     }
                     if (success) {
                         renderPanel();
-                        showToast('已删除', 'success');
+                        window.showToast('已删除', 'success');
                     }
                 });
                 item.addEventListener('click', async function(e) {
@@ -249,28 +231,12 @@
                             document.getElementById('emojiPanel').classList.remove('open');
                         }
                     } else {
-                        showToast('对方表情不可手动发送', 'info');
+                        window.showToast('对方表情不可手动发送', 'info');
                     }
                 });
                 grid.appendChild(item);
             });
             container.appendChild(grid);
-        }
-    }
-
-    function showToast(msg, type) {
-        const toast = document.getElementById('toast');
-        if (toast) {
-            toast.textContent = msg;
-            toast.className = 'toast ' + (type || 'info');
-            void toast.offsetWidth;
-            toast.classList.add('show');
-            clearTimeout(toast._hideTimer);
-            toast._hideTimer = setTimeout(function() {
-                toast.classList.remove('show');
-            }, 2200);
-        } else {
-            alert(msg);
         }
     }
 
@@ -384,12 +350,11 @@
             });
         }
 
-        loadData().then(function() {
-            if (panel && panel.classList.contains('open')) {
-                renderPanel();
-            }
-        });
+        // ★ 移除 loadData()，由 app.js 统一触发 reload()
+        if (panel && panel.classList.contains('open')) {
+            renderPanel();
+        }
     });
 
-    console.log('✅ 表情包模块已加载（发送图片已加入压缩逻辑）');
+    console.log('✅ 表情包模块已加载（使用安全存储）');
 })();

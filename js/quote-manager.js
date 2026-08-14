@@ -12,17 +12,11 @@
     let chatArea = null;
     let msgInput = null;
 
-    // ★ 严格依赖主程序提供的 getStorageKey
-    function getKey() {
-        if (typeof window.getStorageKey !== 'function') {
-            throw new Error('引用设置：window.getStorageKey 未定义');
-        }
-        return window.getStorageKey('quoteSettings');
-    }
-
+    // ★ 使用全局安全存储与防御性键生成
     async function loadSettings() {
         try {
-            const data = await localforage.getItem(getKey());
+            const key = getStorageKey('quoteSettings');
+            const data = await safeGetItem(key);
             if (data && typeof data.enabled === 'boolean') {
                 isQuoteEnabled = data.enabled;
             } else {
@@ -38,7 +32,8 @@
 
     async function saveSettings() {
         try {
-            await localforage.setItem(getKey(), { enabled: isQuoteEnabled });
+            const key = getStorageKey('quoteSettings');
+            await safeSetItem(key, { enabled: isQuoteEnabled });
             console.log('[引用] 保存成功:', isQuoteEnabled);
         } catch (e) {
             console.warn('保存引用设置失败:', e);
@@ -155,7 +150,7 @@
         if (!quoteBar) {
             quoteBar = document.createElement('div');
             quoteBar.id = 'quoteBar';
-            // ★ 关键修改：直接追加到 inputBar 内部，而非插入到其前面
+            // 追加到输入栏内部
             const inputBar = document.getElementById('inputBar');
             inputBar.appendChild(quoteBar); 
         }
@@ -171,7 +166,7 @@
         });
         if (msgInput) msgInput.focus();
 
-        // ★ 新增：显示引用条后，更新聊天区域底部间距，留出位置
+        // 更新聊天区域底部间距
         if (typeof window.updateChatPadding === 'function') {
             window.updateChatPadding();
         }
@@ -182,7 +177,7 @@
         if (quoteBar) quoteBar.style.display = 'none';
         quotedMessage = null;
 
-        // ★ 新增：隐藏引用条后，恢复聊天区域底部间距
+        // 恢复聊天区域底部间距
         if (typeof window.updateChatPadding === 'function') {
             window.updateChatPadding();
         }

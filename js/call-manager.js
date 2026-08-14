@@ -39,7 +39,6 @@
     // ---------- 发送普通聊天消息 ----------
     function sendChatMessage(text, sender) {
         if (typeof window.addMessage === 'function') {
-            // 强制使用 'normal' 类型，保证以气泡形式呈现
             window.addMessage(text, sender, 'normal');
         } else {
             console.warn('addMessage not available');
@@ -518,7 +517,7 @@
                     window.renderMessages();
                 }
                 if (typeof window.saveMessages === 'function') window.saveMessages();
-                localforage.removeItem(MISSED_CALL_KEY);
+                safeRemoveItem(MISSED_CALL_KEY);
             }
         }
         endCall();
@@ -526,7 +525,7 @@
 
     function handleIncomingAnswer() {
         if (currentState !== STATE.INCOMING) return;
-        localforage.removeItem(MISSED_CALL_KEY);
+        safeRemoveItem(MISSED_CALL_KEY);
         currentState = STATE.IN_CALL;
         callStartTime = new Date();
         initiator = 'partner';
@@ -591,7 +590,7 @@
         initiator = 'partner';
         
         // ★ 存储时带上 initiator（拨打方），防止页面刷新后无法还原谁发起的
-        localforage.setItem(MISSED_CALL_KEY, {
+        safeSetItem(MISSED_CALL_KEY, {
             startTime: startTime,
             timeoutAt: startTime + 20000,
             initiator: initiator 
@@ -621,14 +620,14 @@
                     window.renderMessages();
                 }
                 if (typeof window.saveMessages === 'function') window.saveMessages();
-                localforage.removeItem(MISSED_CALL_KEY);
+                safeRemoveItem(MISSED_CALL_KEY);
                 endCall();
             }
         }, 20000);
     }
 
     async function checkForMissedCall() {
-        const missed = await localforage.getItem(MISSED_CALL_KEY);
+        const missed = await safeGetItem(MISSED_CALL_KEY);
         if (!missed) return;
 
         const now = Date.now();
@@ -654,7 +653,7 @@
                 window.renderMessages();
             }
             if (typeof window.saveMessages === 'function') window.saveMessages();
-            await localforage.removeItem(MISSED_CALL_KEY);
+            await safeRemoveItem(MISSED_CALL_KEY);
         };
 
         if (now >= missed.timeoutAt) {
@@ -662,7 +661,7 @@
         } else {
             const remaining = missed.timeoutAt - now;
             setTimeout(async () => {
-                const stillMissed = await localforage.getItem(MISSED_CALL_KEY);
+                const stillMissed = await safeGetItem(MISSED_CALL_KEY);
                 if (stillMissed) {
                     await generateMissedMessage(stillMissed.startTime);
                 }
@@ -740,6 +739,7 @@
     window.callManager = {
         endCall: endCall,
         getState: () => currentState,
-        checkCallInterruption: checkCallInterruption 
+        checkCallInterruption: checkCallInterruption,
+        startCall: startCall // ★ 添加 startCall 以便外部调用
     };
 })();

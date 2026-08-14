@@ -2,7 +2,7 @@
 (function() {
     'use strict';
 
-    // 兼容 window.APP_PREFIX，如果未定义则使用默认值
+    // 兼容 window.APP_PREFIX，如果未定义则使用默认值（实际已在 config.js 中定义）
     const APP_PREFIX = window.APP_PREFIX || 'CHAT_APP_V3_';
 
     // ===== 存储信息更新 =====
@@ -77,16 +77,22 @@
             window.myName = data.myName || '我';
             window.isDark = data.isDark || false;
             window.lastMsgId = data.lastMsgId || 0;
-            
+
             // 调用主程序的全局保存函数
             if (typeof window.saveMessages === 'function') window.saveMessages();
             else if (typeof localStorage !== 'undefined') {
                 // 降级手动保存
                 try {
-                    const key = `${APP_PREFIX}${window.SESSION_ID}_chatData`;
-                    const saveData = { messages: window.messages.slice(-500), partnerName: window.partnerName, myName: window.myName, isDark: window.isDark, lastMsgId: window.lastMsgId };
-                    await localforage.setItem(key, saveData);
-                } catch(e){}
+                    const key = getStorageKey('chatData');
+                    const saveData = {
+                        messages: window.messages.slice(-500),
+                        partnerName: window.partnerName,
+                        myName: window.myName,
+                        isDark: window.isDark,
+                        lastMsgId: window.lastMsgId
+                    };
+                    await safeSetItem(key, saveData);
+                } catch (e) {}
             }
 
             if (data.cards && window.cardManager) {
@@ -111,7 +117,7 @@
 
             const contactName = document.getElementById('contactName');
             if (contactName) contactName.textContent = window.partnerName;
-            
+
             if (typeof window.renderMessages === 'function') window.renderMessages();
             if (window.cardManager && typeof window.cardManager.reload === 'function') window.cardManager.reload();
             if (window.emojiManager && typeof window.emojiManager.reload === 'function') window.emojiManager.reload();
@@ -129,7 +135,13 @@
         let fileName = '';
         switch (moduleType) {
             case 'messages':
-                data = { messages: window.messages, partnerName: window.partnerName, myName: window.myName, isDark: window.isDark, lastMsgId: window.lastMsgId };
+                data = {
+                    messages: window.messages,
+                    partnerName: window.partnerName,
+                    myName: window.myName,
+                    isDark: window.isDark,
+                    lastMsgId: window.lastMsgId
+                };
                 fileName = 'chat-messages.json';
                 break;
             case 'cards':
@@ -154,7 +166,8 @@
                 };
                 fileName = 'avatar-backup.json';
                 break;
-            default: return;
+            default:
+                return;
         }
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -249,7 +262,7 @@
                         reloadNeeded = true;
                     }
 
-                    // ★ 【关键修复】直接给全局变量赋值，取代不存在的 setPartnerName/setMyName
+                    // ★ 【关键修复】直接给全局变量赋值
                     if (data.partnerName && typeof window.partnerName !== 'undefined') {
                         window.partnerName = data.partnerName;
                         reloadNeeded = true;
@@ -264,7 +277,7 @@
                         if (typeof window.saveMessages === 'function') await window.saveMessages();
                         const contactName = document.getElementById('contactName');
                         if (contactName) {
-                            contactName.textContent = window.partnerName; // 直接取最新变量更新导航栏
+                            contactName.textContent = window.partnerName;
                         }
                         if (typeof window.renderMessages === 'function') window.renderMessages();
                         if (typeof window.showToast === 'function') window.showToast('头像、背景及昵称恢复成功', 'success');
@@ -273,7 +286,8 @@
                     }
                     break;
 
-                default: if (typeof window.showToast === 'function') window.showToast('未知模块', 'error');
+                default:
+                    if (typeof window.showToast === 'function') window.showToast('未知模块', 'error');
             }
         } catch (err) {
             if (typeof window.showToast === 'function') window.showToast('导入失败: ' + err.message, 'error');

@@ -7,20 +7,17 @@
     let chatBg = null;
 
     function getKey(base) {
-        if (typeof window.getStorageKey === 'function') {
-            return window.getStorageKey(base);
-        }
-        return 'CHAT_APP_V3_' + base;
+        return getStorageKey(base);
     }
 
     async function loadData() {
         try {
-            const data = await localforage.getItem(getKey('avatarData'));
+            const data = await safeGetItem(getKey('avatarData'));
             if (data) {
                 if (data.myAvatar !== undefined) myAvatar = data.myAvatar;
                 if (data.partnerAvatar !== undefined) partnerAvatar = data.partnerAvatar;
             }
-            const bg = await localforage.getItem(getKey('chatBg'));
+            const bg = await safeGetItem(getKey('chatBg'));
             if (bg !== undefined) chatBg = bg;
         } catch (e) {
             console.warn('加载头像/背景失败，SESSION_ID 可能未就绪:', e);
@@ -34,19 +31,37 @@
 
     async function saveData() {
         try {
-            await localforage.setItem(getKey('avatarData'), { myAvatar, partnerAvatar });
-            if (chatBg) await localforage.setItem(getKey('chatBg'), chatBg);
-            else await localforage.removeItem(getKey('chatBg'));
-        } catch (e) { console.warn('保存头像/背景失败:', e); }
+            await safeSetItem(getKey('avatarData'), { myAvatar, partnerAvatar });
+            if (chatBg) {
+                await safeSetItem(getKey('chatBg'), chatBg);
+            } else {
+                await safeRemoveItem(getKey('chatBg'));
+            }
+        } catch (e) {
+            console.warn('保存头像/背景失败:', e);
+        }
     }
 
     window.avatarManager = {
         getMyAvatar: () => myAvatar,
         getPartnerAvatar: () => partnerAvatar,
         getChatBg: () => chatBg,
-        setMyAvatar: async function(dataUrl) { myAvatar = dataUrl || null; await saveData(); this.notifyUpdate(); },
-        setPartnerAvatar: async function(dataUrl) { partnerAvatar = dataUrl || null; await saveData(); this.notifyUpdate(); },
-        setChatBg: async function(dataUrl) { chatBg = dataUrl || null; await saveData(); this.applyBg(); this.notifyUpdate(); },
+        setMyAvatar: async function(dataUrl) {
+            myAvatar = dataUrl || null;
+            await saveData();
+            this.notifyUpdate();
+        },
+        setPartnerAvatar: async function(dataUrl) {
+            partnerAvatar = dataUrl || null;
+            await saveData();
+            this.notifyUpdate();
+        },
+        setChatBg: async function(dataUrl) {
+            chatBg = dataUrl || null;
+            await saveData();
+            this.applyBg();
+            this.notifyUpdate();
+        },
         removeChatBg: async function() {
             if (confirm('移除背景？')) {
                 chatBg = null;
@@ -58,8 +73,7 @@
         },
         applyBg: function() {
             if (chatBg) {
-                // 🛠️ 修复：加上了双引号包裹，防止逗号/括号等特殊字符导致 CSS 解析失败
-                document.documentElement.style.setProperty('--chat-bg-image', 'url("' + chatBg + '")');
+                document.documentElement.style.setProperty('--chat-bg-image', `url(${chatBg})`);
                 document.body.classList.add('with-background');
             } else {
                 document.documentElement.style.removeProperty('--chat-bg-image');
@@ -74,7 +88,9 @@
             };
         },
         importData: function(data, mode) {
-            if (!data || typeof data !== 'object') return { success: false, message: '无效数据' };
+            if (!data || typeof data !== 'object') {
+                return { success: false, message: '无效数据' };
+            }
             if (mode === 'overwrite') {
                 if (data.myAvatar !== undefined) myAvatar = data.myAvatar;
                 if (data.partnerAvatar !== undefined) partnerAvatar = data.partnerAvatar;
@@ -99,7 +115,9 @@
         reload: async function() {
             await loadData();
             this.applyBg();
-            if (document.getElementById('avatarPanel').classList.contains('open')) renderPanel();
+            if (document.getElementById('avatarPanel').classList.contains('open')) {
+                renderPanel();
+            }
             this.notifyUpdate();
         }
     };
@@ -144,9 +162,6 @@
             </div>
         `;
 
-        // ===============================
-        // 🛠️ 修复点 1：头像上传及自动压缩功能
-        // ===============================
         container.querySelectorAll('.avatar-upload-btn').forEach(btn => {
             btn.addEventListener('click', function() {
                 const target = this.dataset.target;
@@ -156,39 +171,20 @@
                 input.onchange = function(e) {
                     const file = e.target.files[0];
                     if (!file) return;
-                    // 统一改为 5MB
-                    if (file.size > 5 * 1024 * 1024) {
-                        showToast('图片不能超过5MB，请压缩后重试', 'error');
+                    if (file.size > 2 * 1024 * 1024) {
+                        showToast('图片不能超过10MB', 'error');
                         return;
                     }
                     const reader = new FileReader();
                     reader.onload = function(ev) {
-                        const img = new Image();
-                        img.onload = function() {
-                            // 头像压缩逻辑：最大边压缩到 300px
-                            const canvas = document.createElement('canvas');
-                            const ctx = canvas.getContext('2d');
-                            let width = img.width;
-                            let height = img.height;
-                            const MAX_WIDTH = 300; 
-                            if (width > MAX_WIDTH) {
-                                height = (MAX_WIDTH / width) * height;
-                                width = MAX_WIDTH;
-                            }
-                            canvas.width = width;
-                            canvas.height = height;
-                            ctx.drawImage(img, 0, 0, width, height);
-                            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                            
-                            if (target === 'my') {
-                                window.avatarManager.setMyAvatar(dataUrl);
-                            } else {
-                                window.avatarManager.setPartnerAvatar(dataUrl);
-                            }
-                            renderPanel();
-                            showToast('头像已更新', 'success');
-                        };
-                        img.src = ev.target.result;
+                        const dataUrl = ev.target.result;
+                        if (target === 'my') {
+                            window.avatarManager.setMyAvatar(dataUrl);
+                        } else {
+                            window.avatarManager.setPartnerAvatar(dataUrl);
+                        }
+                        renderPanel();
+                        showToast('头像已更新', 'success');
                     };
                     reader.readAsDataURL(file);
                 };
@@ -211,9 +207,6 @@
             });
         });
 
-        // ===============================
-        // 🛠️ 修复点 2：背景上传及自动压缩功能
-        // ===============================
         container.querySelector('.bg-upload-btn')?.addEventListener('click', function() {
             const input = document.createElement('input');
             input.type = 'file';
@@ -221,35 +214,16 @@
             input.onchange = function(e) {
                 const file = e.target.files[0];
                 if (!file) return;
-                // 统一改为 10MB
-                if (file.size > 10 * 1024 * 1024) {
-                    showToast('图片不能超过10MB，请压缩后重试', 'error');
+                if (file.size > 2 * 1024 * 1024) {
+                    showToast('图片不能超过10MB', 'error');
                     return;
                 }
                 const reader = new FileReader();
                 reader.onload = function(ev) {
-                    const img = new Image();
-                    img.onload = function() {
-                        // 背景压缩逻辑：最大边压缩到 1000px
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        let width = img.width;
-                        let height = img.height;
-                        const MAX_WIDTH = 1000;
-                        if (width > MAX_WIDTH) {
-                            height = (MAX_WIDTH / width) * height;
-                            width = MAX_WIDTH;
-                        }
-                        canvas.width = width;
-                        canvas.height = height;
-                        ctx.drawImage(img, 0, 0, width, height);
-                        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-
-                        window.avatarManager.setChatBg(dataUrl);
-                        renderPanel();
-                        showToast('背景已更新', 'success');
-                    };
-                    img.src = ev.target.result;
+                    const dataUrl = ev.target.result;
+                    window.avatarManager.setChatBg(dataUrl);
+                    renderPanel();
+                    showToast('背景已更新', 'success');
                 };
                 reader.readAsDataURL(file);
             };
@@ -288,9 +262,6 @@
             });
         }
 
-        loadData().then(() => {
-            window.avatarManager.applyBg();
-            setTimeout(() => window.avatarManager.notifyUpdate(), 100);
-        });
+        // ★ 移除 loadData()，由 app.js 统一触发 reload()
     });
 })();

@@ -16,30 +16,39 @@
     let loadAttempts = 0;
     const MAX_LOAD_ATTEMPTS = 3;
 
-    // ★ 严格依赖主程序提供的 getStorageKey
     function getKey() {
-        if (typeof window.getStorageKey !== 'function') {
-            throw new Error('频率设置：window.getStorageKey 未定义，请确保主程序已初始化');
-        }
-        return window.getStorageKey('frequencySettings');
+        return getStorageKey('frequencySettings');
     }
 
-    // ★ 带重试机制的加载
+    // ★ 加载设置，并严格防止错误覆盖数据
     async function loadSettings() {
         loadAttempts++;
         try {
             const key = getKey();
             console.log(`[频率] 尝试加载 (${loadAttempts})，键:`, key);
-            const data = await localforage.getItem(key);
-            if (data && typeof data === 'object') {
+            const data = await safeGetItem(key);
+
+            const isValid = data && typeof data === 'object' && Object.keys(data).length > 0;
+
+            if (isValid) {
                 settings = { ...DEFAULTS, ...data };
                 console.log('[频率] 加载成功:', settings);
                 loadAttempts = 0;
                 return true;
             } else {
-                console.warn('[频率] 未找到存储数据，使用默认值');
-                settings = { ...DEFAULTS };
-                await saveSettings();
+                console.warn('[频率] 主存储数据无效或不存在，尝试从 localStorage 备用恢复...');
+                const restored = restoreFromLocalStorage();
+                if (restored) {
+                    console.log('[频率] 从 localStorage 恢复成功');
+                    try {
+                        await safeSetItem(key, settings);
+                    } catch (e) {
+                        console.warn('[频率] 写回主存储失败，但不影响使用');
+                    }
+                } else {
+                    console.warn('[频率] 无备用数据，使用默认值');
+                    settings = { ...DEFAULTS };
+                }
                 loadAttempts = 0;
                 return true;
             }
@@ -50,10 +59,17 @@
                 await new Promise(resolve => setTimeout(resolve, 1000 * loadAttempts));
                 return loadSettings();
             } else {
-                console.error('[频率] 重试次数用尽，使用默认值');
-                settings = { ...DEFAULTS };
-                loadAttempts = 0;
-                return false;
+                console.error('[频率] 重试次数用尽，尝试从 localStorage 恢复');
+                const restored = restoreFromLocalStorage();
+                if (restored) {
+                    console.log('[频率] 从 localStorage 恢复成功（重试后）');
+                    loadAttempts = 0;
+                    return true;
+                } else {
+                    settings = { ...DEFAULTS };
+                    loadAttempts = 0;
+                    return false;
+                }
             }
         }
     }
@@ -61,28 +77,25 @@
     async function saveSettings() {
         try {
             const key = getKey();
-            await localforage.setItem(key, settings);
+            await safeSetItem(key, settings);
             console.log('[频率] 保存成功:', settings);
         } catch (e) {
-            console.error('[频率] 保存失败:', e);
-            // 降级到 localStorage
-            try {
-                localStorage.setItem('frequencySettings_fallback', JSON.stringify(settings));
-                console.log('[频率] 已保存到 localStorage 作为备用');
-            } catch (lsErr) {
-                console.error('[频率] localStorage 降级保存也失败:', lsErr);
-            }
+            console.error('[频率] safeSetItem 失败:', e);
+        }
+        try {
+            localStorage.setItem('frequencySettings_fallback', JSON.stringify(settings));
+            console.log('[频率] 已保存到 localStorage 作为备用');
+        } catch (lsErr) {
+            console.error('[频率] localStorage 备用保存也失败:', lsErr);
         }
     }
 
-    // ★ 从 localStorage 恢复（备用）
     function restoreFromLocalStorage() {
         try {
             const raw = localStorage.getItem('frequencySettings_fallback');
             if (raw) {
                 const parsed = JSON.parse(raw);
                 settings = { ...DEFAULTS, ...parsed };
-                console.log('[频率] 从 localStorage 恢复成功');
                 return true;
             }
         } catch (e) {
@@ -91,14 +104,13 @@
         return false;
     }
 
-    // ---------- UI渲染与事件绑定（保证只绑定一次） ----------
+    // ---------- UI渲染与事件绑定 ----------
     let uiEventsBound = false;
 
     function renderUI() {
-        const settings = getSettings();
-        console.log('[频率] 渲染UI，当前设置:', settings);
+        // ★ 修复：这里直接使用外层闭包的 settings 变量，不要调用不存在的 getSettings()
+        console.log('[频率] 渲染面板，当前设置:', settings);
 
-        // 回复速度 - 最短时间
         const minSlider = document.getElementById('replyMinSlider');
         const minDisplay = document.getElementById('replyMinDisplay');
         if (minSlider) {
@@ -106,7 +118,6 @@
             if (minDisplay) minDisplay.textContent = settings.replyMin;
         }
 
-        // 回复速度 - 最长时间
         const maxSlider = document.getElementById('replyMaxSlider');
         const maxDisplay = document.getElementById('replyMaxDisplay');
         if (maxSlider) {
@@ -114,13 +125,11 @@
             if (maxDisplay) maxDisplay.textContent = settings.replyMax;
         }
 
-        // 主动发送开关
         const activeToggle = document.getElementById('activeEnabledToggle');
         if (activeToggle) {
             activeToggle.checked = settings.activeEnabled;
         }
 
-        // 主动发送间隔
         const intervalSlider = document.getElementById('activeIntervalSlider');
         const intervalDisplay = document.getElementById('activeIntervalDisplay');
         if (intervalSlider) {
@@ -128,13 +137,11 @@
             if (intervalDisplay) intervalDisplay.textContent = settings.activeInterval;
         }
 
-        // 合并消息 - 表情合并
         const mergeEmoji = document.getElementById('mergeEmojiToggle');
         if (mergeEmoji) {
             mergeEmoji.checked = settings.mergeEmoji;
         }
 
-        // 合并消息 - 字卡拼接
         const mergeCards = document.getElementById('mergeCardsToggle');
         if (mergeCards) {
             mergeCards.checked = settings.mergeCards;
@@ -154,7 +161,6 @@
         const minDisplay = document.getElementById('replyMinDisplay');
         const maxDisplay = document.getElementById('replyMaxDisplay');
 
-        // 最短时间滑块
         if (minSlider) {
             minSlider.addEventListener('input', function() {
                 const val = parseInt(this.value);
@@ -168,7 +174,6 @@
             });
         }
 
-        // 最长时间滑块
         if (maxSlider) {
             maxSlider.addEventListener('input', function() {
                 const val = parseInt(this.value);
@@ -182,7 +187,6 @@
             });
         }
 
-        // 主动发送开关
         const activeToggle = document.getElementById('activeEnabledToggle');
         if (activeToggle) {
             activeToggle.addEventListener('change', function() {
@@ -195,7 +199,6 @@
             });
         }
 
-        // 主动发送间隔
         const intervalSlider = document.getElementById('activeIntervalSlider');
         const intervalDisplay = document.getElementById('activeIntervalDisplay');
         if (intervalSlider) {
@@ -211,7 +214,6 @@
             });
         }
 
-        // 表情合并消息
         const mergeEmoji = document.getElementById('mergeEmojiToggle');
         if (mergeEmoji) {
             mergeEmoji.addEventListener('change', function() {
@@ -219,7 +221,6 @@
             });
         }
 
-        // 字卡拼接
         const mergeCards = document.getElementById('mergeCardsToggle');
         if (mergeCards) {
             mergeCards.addEventListener('change', function() {
@@ -229,24 +230,21 @@
     }
 
     function initUI() {
-    renderUI();
-    bindUIEvents();
-    // 监听设置变化，只更新显示文字，避免干扰拖动
-    document.addEventListener('frequencySettingsChanged', function() {
-        const panel = document.getElementById('frequencySettingsPanel');
-        if (panel && panel.classList.contains('open')) {
-            // 只更新显示数字，不设置滑块 value
-            const settings = frequencyManager.getSettings();
-            const minDisplay = document.getElementById('replyMinDisplay');
-            if (minDisplay) minDisplay.textContent = settings.replyMin || 1;
-            const maxDisplay = document.getElementById('replyMaxDisplay');
-            if (maxDisplay) maxDisplay.textContent = settings.replyMax || 30;
-            const intervalDisplay = document.getElementById('activeIntervalDisplay');
-            if (intervalDisplay) intervalDisplay.textContent = settings.activeInterval || 5;
-            // 注意：不要更新 slider.value，让用户拖动不受干扰
-        }
-    });
-}
+        renderUI();
+        bindUIEvents();
+        document.addEventListener('frequencySettingsChanged', function() {
+            const panel = document.getElementById('frequencySettingsPanel');
+            if (panel && panel.classList.contains('open')) {
+                const currentSettings = window.frequencyManager.getSettings();
+                const minDisplay = document.getElementById('replyMinDisplay');
+                if (minDisplay) minDisplay.textContent = currentSettings.replyMin || 1;
+                const maxDisplay = document.getElementById('replyMaxDisplay');
+                if (maxDisplay) maxDisplay.textContent = currentSettings.replyMax || 30;
+                const intervalDisplay = document.getElementById('activeIntervalDisplay');
+                if (intervalDisplay) intervalDisplay.textContent = currentSettings.activeInterval || 5;
+            }
+        });
+    }
 
     // ---------- 核心管理对象 ----------
     const frequencyManager = {
@@ -358,16 +356,14 @@
         save: saveSettings,
         getDefaults: function() { return { ...DEFAULTS }; },
 
-        // UI相关
         renderUI: renderUI,
         bindUIEvents: bindUIEvents,
         initUI: initUI,
 
-        // 调试工具
         inspect: async function() {
             try {
                 const key = getKey();
-                const data = await localforage.getItem(key);
+                const data = await safeGetItem(key);
                 console.log('[频率] 存储键:', key);
                 console.log('[频率] 存储值:', data);
                 console.log('[频率] 当前内存 settings:', settings);

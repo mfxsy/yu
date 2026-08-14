@@ -34,28 +34,28 @@
     let filterGroupId = null;
     let showGroupTabs = false;
 
+    // 使用全局 getStorageKey，确保永不抛错
     function getKey(base) {
-        if (typeof window.getStorageKey === 'function') {
-            return window.getStorageKey(base);
-        }
-        return 'CHAT_APP_V3_' + base;
+        return getStorageKey(base);
     }
 
     async function loadData() {
         try {
             const key = getKey('cardData');
-            const data = await localforage.getItem(key);
+            const data = await safeGetItem(key);
             if (data) {
                 if (data.cards) cards = data.cards;
                 if (data.textEmojis) textEmojis = data.textEmojis;
             }
-        } catch (e) {}
+        } catch (e) {
+            // 忽略
+        }
         if (cards.length === 0) cards = [...DEFAULT_CARDS];
         if (textEmojis.length === 0) textEmojis = [...DEFAULT_EMOJIS];
 
         try {
             const gKey = getKey('groupData');
-            const gData = await localforage.getItem(gKey);
+            const gData = await safeGetItem(gKey);
             if (gData && Array.isArray(gData)) groups = gData;
             else groups = [];
         } catch (e) { groups = []; }
@@ -66,13 +66,13 @@
 
     async function saveData() {
         try {
-            await localforage.setItem(getKey('cardData'), { cards, textEmojis });
+            await safeSetItem(getKey('cardData'), { cards, textEmojis });
         } catch (e) { console.warn('保存字卡失败:', e); }
     }
 
     async function saveGroups() {
         try {
-            await localforage.setItem(getKey('groupData'), groups);
+            await safeSetItem(getKey('groupData'), groups);
         } catch (e) { console.warn('保存分组失败:', e); }
     }
 
@@ -399,7 +399,6 @@
 
     // ===== 自定义确认弹窗（修复移动端 confirm 无效问题） =====
     function showConfirmDialog(message, onConfirm, onCancel) {
-        // 如果已经存在弹窗，先移除
         const existing = document.getElementById('customConfirmOverlay');
         if (existing) existing.remove();
 
@@ -430,7 +429,6 @@
         const countEl = document.getElementById('cardCount');
         if (!container) return;
 
-        // 更新 Tab 样式
         const tabs = document.querySelectorAll('#cardPanel .card-tab-btn');
         tabs.forEach(btn => {
             btn.classList.toggle('active', btn.dataset.tab === currentTab);
@@ -442,11 +440,9 @@
         }
         updateGroupSelectOptions();
 
-        // 统一恢复默认按钮文字
         const resetBtn = document.getElementById('resetDefaultCards');
         if (resetBtn) resetBtn.textContent = '恢复默认';
 
-        // ★ 在字卡和emoji切换栏(上方) 新增搜索功能 ★
         const tabsContainer = document.querySelector('#cardPanel .card-tabs');
         let globalSearchBar = document.getElementById('globalCardSearch');
         if (!globalSearchBar && tabsContainer) {
@@ -459,7 +455,6 @@
                     <input id="globalSearchInput" placeholder="搜索..." style="width:100%;padding:6px 12px 6px 30px;border:1px solid var(--wechat-border);border-radius:20px;background:var(--wechat-input-bg);color:var(--wechat-text-primary);outline:none;font-size:13px;transition:border-color 0.2s;" />
                 </div>
             `;
-            // 插入到 card-tabs 的上方
             tabsContainer.parentNode.insertBefore(globalSearchBar, tabsContainer);
             
             const globalSearchInput = document.getElementById('globalSearchInput');
@@ -479,23 +474,16 @@
                 });
             }
         } else {
-            // 跨标签页切换时，保证输入框内文字和搜索状态同步
             const globalSearchInput = document.getElementById('globalSearchInput');
             if (globalSearchInput && globalSearchInput.value !== (window.cardManager.searchQuery || '')) {
                 globalSearchInput.value = window.cardManager.searchQuery || '';
             }
         }
 
-        // 获取搜索关键字
         const searchQuery = window.cardManager.searchQuery || '';
         let listHtml = '';
 
         if (currentTab === 'cards') {
-            // ==========================================
-            // 字卡栏（修复：去除隐藏标签后的多余分割线）
-            // ==========================================
-            
-            // 1. 构建主切换按钮
             let controlHtml = `
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
                     <button class="filter-btn ${!showGroupTabs ? 'active' : ''}" data-filter="all" style="flex:1;padding:6px 0;border-radius:20px;border:1px solid var(--wechat-border);background:${!showGroupTabs ? 'var(--wechat-green)' : 'transparent'};color:${!showGroupTabs ? '#fff' : 'var(--wechat-text-primary)'};cursor:pointer;font-weight:500;text-align:center;">未分组</button>
@@ -504,9 +492,7 @@
                 </div>
             `;
 
-            // 2. 构建分组横向标签栏（选择标签后隐藏滑动条）
             let groupTagsHtml = '';
-            // 只有进入已分组并且还没有选中标签时，才显示标签滑动条
             if (showGroupTabs && !filterGroupId) {
                 groupTagsHtml = `<div style="overflow-x:auto;white-space:nowrap;padding-bottom:6px;margin-bottom:10px;display:flex;gap:8px;scrollbar-width:none;-webkit-overflow-scrolling:touch;">`;
                 if (groups.length === 0) {
@@ -520,19 +506,16 @@
                 groupTagsHtml += `</div>`;
             }
 
-            // 3. 列表内容块
             let contentHtml = '';
 
             if (showGroupTabs) {
                 if (filterGroupId) {
-                    // ★ 已选择分组，隐藏完整标签栏，只保留取消筛选按钮 ★
                     const grp = groups.find(g => String(g.id) === String(filterGroupId));
                     if (grp) {
                         let displayItems = searchQuery 
                             ? cards.filter(c => c.includes(searchQuery) && grp.items.includes(c))
                             : cards.filter(c => grp.items.includes(c));
                         
-                        // ★【修改点】去除了 border-top 和多余的 padding-top，防止出现残留线条 ★
                         contentHtml = `
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
                                 <span style="font-size:14px;font-weight:600;color:var(--wechat-green);">${grp.name}（${displayItems.length} 个）</span>
@@ -550,14 +533,12 @@
                         renderPanel(); return;
                     }
                 } else {
-                    // ★ 已分组，但未选择任何标签 ★
                     contentHtml = `<div class="card-empty" style="padding:40px 0;"><i class="fas fa-hand-pointer"></i><p>请选择分组</p></div>`;
                     if (window.cardManager.searchQuery && window.cardManager.searchQuery.trim().length > 0) {
                         showToast('请选择分组标签后再搜索', 'warning');
                     }
                 }
             } else {
-                // ★ 未分组模式 ★
                 const displayItems = searchQuery ? cards.filter(c => c.includes(searchQuery)) : cards;
                 if (displayItems.length === 0) {
                     contentHtml = `<div class="card-empty"><i class="fas fa-book-open"></i><p>未找到匹配的字卡</p></div>`;
@@ -569,24 +550,17 @@
             listHtml = controlHtml + groupTagsHtml + contentHtml;
 
         } else {
-            // ==========================================
-            // Emoji 栏
-            // ==========================================
             const displayItems = searchQuery ? textEmojis.filter(e => e.includes(searchQuery)) : textEmojis;
             listHtml = buildEmojiListHtml(displayItems);
         }
 
-        // ★ 插入新列表 ★
         container.innerHTML = listHtml;
 
-        // ★ 更新底部计数（红圈位置保留） ★
         if (countEl) {
             const itemsCount = currentTab === 'cards' ? cards.length : textEmojis.length;
             countEl.textContent = `共 ${itemsCount} 条`;
         }
 
-        // ★ 分组交互事件绑定 ★
-        // 1. 切换未分组/已分组
         container.querySelectorAll('.filter-btn[data-filter="all"]').forEach(btn => {
             btn.addEventListener('click', function() {
                 showGroupTabs = false;
@@ -610,7 +584,6 @@
             });
         });
 
-        // 2. 横向标签点击
         container.querySelectorAll('.group-tab').forEach(btn => {
             btn.addEventListener('click', function() {
                 const gid = this.dataset.groupid;
@@ -623,7 +596,6 @@
             });
         });
 
-        // 3. 【取消筛选】按钮事件（点击返回已分组未选标签状态）
         const clearBtn = container.querySelector('#clearFilterBtn');
         if (clearBtn) {
             clearBtn.addEventListener('click', function() {
@@ -632,7 +604,6 @@
             });
         }
 
-        // 4. 打开分组管理
         const mgrBtn = container.querySelector('#openGroupManagerBtn');
         if (mgrBtn) {
             mgrBtn.addEventListener('click', function(e) {
@@ -641,7 +612,6 @@
             });
         }
 
-        // ★ 通用操作事件绑定（编辑、删除、分组分配） ★
         container.addEventListener('click', async function(e) {
             const btn = e.target.closest('.edit-btn');
             if (btn) {
@@ -947,7 +917,7 @@
         }
     }
 
-    // ===== DOM 初始化 =====
+    // ===== DOM 初始化：仅绑定事件，不再过早加载 =====
     document.addEventListener('DOMContentLoaded', function() {
         const addBtn = document.getElementById('addCardBtn');
         const input = document.getElementById('newCardInput');
@@ -1023,15 +993,13 @@
             });
         }
 
-        loadData().then(() => {
-            updateGroupSelectOptions();
-            if (panel && panel.classList.contains('open')) {
-                renderPanel();
-            }
-        });
+        // ★ 移除 loadData()，由 app.js 统一触发 reload()
+        if (panel && panel.classList.contains('open')) {
+            renderPanel();
+        }
     });
 
-    // ---- 批量添加对话框 ----
+    // ---- 批量添加对话框 ---- (保持原样)
     function showBatchDialog() {
         const overlay = document.createElement('div');
         overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;';
@@ -1082,7 +1050,7 @@
         });
     }
 
-    // ---- 导入JSON对话框 ----
+    // ---- 导入JSON对话框 ---- (保持原样)
     function showImportDialog() {
         const overlay = document.createElement('div');
         overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;';
@@ -1101,7 +1069,6 @@
         document.body.appendChild(overlay);
 
         const close = () => overlay.remove();
-
         dialog.querySelector('#importCancelBtn').addEventListener('click', close);
         overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
 
