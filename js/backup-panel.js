@@ -2,7 +2,6 @@
 (function() {
     'use strict';
 
-    // 兼容 window.APP_PREFIX，如果未定义则使用默认值（实际已在 config.js 中定义）
     const APP_PREFIX = window.APP_PREFIX || 'CHAT_APP_V3_';
 
     // ===== 存储信息更新 =====
@@ -78,10 +77,8 @@
             window.isDark = data.isDark || false;
             window.lastMsgId = data.lastMsgId || 0;
 
-            // 调用主程序的全局保存函数
             if (typeof window.saveMessages === 'function') window.saveMessages();
             else if (typeof localStorage !== 'undefined') {
-                // 降级手动保存
                 try {
                     const key = getStorageKey('chatData');
                     const saveData = {
@@ -157,7 +154,6 @@
                 fileName = 'text-emojis.json';
                 break;
             case 'avatar':
-                // ★ 整合头像/背景和双方昵称导出
                 const avatarData = window.avatarManager ? window.avatarManager.exportData() : {};
                 data = {
                     avatar: avatarData,
@@ -248,21 +244,17 @@
                     break;
 
                 case 'avatar':
-                    // ★ 整合导入头像/背景以及双方昵称
                     let reloadNeeded = false;
-                    // 1. 处理头像和背景数据
                     if (data.avatar && window.avatarManager) {
                         await window.avatarManager.importData(data.avatar, mode);
                         if (typeof window.avatarManager.reload === 'function') await window.avatarManager.reload();
                         reloadNeeded = true;
                     } else if (!data.avatar && (data.myAvatar !== undefined || data.partnerAvatar !== undefined) && window.avatarManager) {
-                        // 兼容旧版直接在根部的格式
                         await window.avatarManager.importData(data, mode);
                         if (typeof window.avatarManager.reload === 'function') await window.avatarManager.reload();
                         reloadNeeded = true;
                     }
 
-                    // ★ 【关键修复】直接给全局变量赋值
                     if (data.partnerName && typeof window.partnerName !== 'undefined') {
                         window.partnerName = data.partnerName;
                         reloadNeeded = true;
@@ -272,7 +264,6 @@
                         reloadNeeded = true;
                     }
 
-                    // 3. 保存并刷新UI
                     if (reloadNeeded) {
                         if (typeof window.saveMessages === 'function') await window.saveMessages();
                         const contactName = document.getElementById('contactName');
@@ -429,20 +420,55 @@
         document.body.appendChild(overlay);
     }
 
-    // ===== 危险操作：清除会话 =====
+    // ==========================================
+    // ★ 危险操作修复：重置时一并重置内存变量 ★
+    // ==========================================
+
+    // 清除会话（仅清除消息，恢复交互设置默认值）
     async function clearCurrentSession() {
         if (!confirm('确定删除当前会话的所有消息吗？此操作不可撤销。')) return;
+        
         window.messages = [];
+        window.partnerName = '梦角';
+        window.myName = '我';
+        window.isDark = false;
+        window.showTimestamp = true;
+        window.noReplyEnabled = false;
+        window.notificationEnabled = false;
+        
+        if (window.quoteManager) window.quoteManager.setEnabled(false);
+        if (window.frequencyManager) window.frequencyManager.resetToDefault();
+
         if (typeof window.saveMessages === 'function') window.saveMessages();
         if (typeof window.renderMessages === 'function') window.renderMessages();
-        if (typeof window.showToast === 'function') window.showToast('会话消息已清除', 'success');
+        
+        const contactName = document.getElementById('contactName');
+        if (contactName) contactName.textContent = window.partnerName;
+        
+        if (typeof window.showToast === 'function') window.showToast('会话及配置已重置为初始状态', 'success');
     }
 
-    // ===== 危险操作：重置数据 =====
+    // 重置所有数据（完全清空）
     async function resetAllData() {
         if (!confirm('确定重置所有数据吗？此操作将清除所有聊天记录、字卡、表情、头像、背景等，且不可恢复！\n请确保已导出备份。')) return;
+        
         try {
+            // 重置内存状态
+            window.messages = [];
+            window.partnerName = '梦角';
+            window.myName = '我';
+            window.isDark = false;
+            window.showTimestamp = true;
+            window.noReplyEnabled = false;
+            window.notificationEnabled = false;
+            
+            if (window.quoteManager) window.quoteManager.setEnabled(false);
+            if (window.frequencyManager) window.frequencyManager.resetToDefault();
+
+            // 清空浏览器存储
             await localforage.clear();
+            localStorage.clear(); // 同时也清空 localStorage 中的备份
+            
             location.reload();
         } catch (e) {
             if (typeof window.showToast === 'function') window.showToast('重置失败: ' + e.message, 'error');
@@ -451,7 +477,6 @@
 
     // ===== 初始化面板按钮事件 =====
     function initBackupPanel() {
-        // 绑定全量按钮
         const exportFullBtn = document.getElementById('exportFullBtn');
         if (exportFullBtn) {
             exportFullBtn.addEventListener('click', exportFullBackup);
@@ -471,7 +496,6 @@
             });
         }
 
-        // 绑定独立模块按钮
         document.querySelectorAll('[data-module]').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 const moduleType = this.dataset.module;
@@ -479,7 +503,6 @@
             });
         });
 
-        // 绑定危险操作按钮
         const clearSessionBtn = document.getElementById('clearSessionBtn');
         if (clearSessionBtn) {
             clearSessionBtn.addEventListener('click', clearCurrentSession);
@@ -490,17 +513,14 @@
             resetAllBtn.addEventListener('click', resetAllData);
         }
 
-        // 绑定存储刷新按钮
         const refreshStorageBtn = document.getElementById('refreshStorageBtn');
         if (refreshStorageBtn) {
             refreshStorageBtn.addEventListener('click', updateStorageInfo);
         }
 
-        // 初始化时执行一次存储统计
         setTimeout(updateStorageInfo, 300);
     }
 
-    // 页面加载完成后执行初始化
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initBackupPanel);
     } else {

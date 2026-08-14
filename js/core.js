@@ -2,10 +2,11 @@
 
 // ---------- 1. 数据加载与保存 ----------
 async function loadMessages() {
+    // 使用局部变量暂存，绝不能一上来就清空 window.messages
     let data = null;
     let fromBackup = false;
 
-    // 1. 先尝试从 IndexedDB 读取（带超时保护）
+    // 1. 先尝试从 IndexedDB 读取
     try {
         const key = getStorageKey('chatData');
         data = await safeGetItem(key);
@@ -13,13 +14,14 @@ async function loadMessages() {
         console.warn('加载消息时发生异常，尝试后备恢复:', e);
     }
 
-    // 2. 如果 IndexedDB 读取失败、超时或返回空，尝试从 localStorage 后备恢复
-    if (!data) {
+    // 2. 如果 IndexedDB 读取失败、返回空，尝试从 localStorage 后备恢复
+    const isEmptyData = !data || (typeof data === 'object' && Object.keys(data).length === 0);
+    if (isEmptyData) {
         try {
             const backupRaw = localStorage.getItem('BACKUP_V1_critical');
             if (backupRaw) {
                 const backup = JSON.parse(backupRaw);
-                if (backup.messages && Array.isArray(backup.messages)) {
+                if (backup.messages && Array.isArray(backup.messages) && backup.messages.length > 0) {
                     data = {
                         messages: backup.messages,
                         partnerName: backup.settings?.partnerName || '梦角',
@@ -36,24 +38,24 @@ async function loadMessages() {
         }
     }
 
-    // 3. 如果有数据（无论是从 IndexedDB 还是后备），应用到全局
-    if (data) {
+    // 3. 只有真正拿到了有效数据，才赋值给 window.messages 并返回 true
+    if (data && typeof data === 'object' && Array.isArray(data.messages) && data.messages.length > 0) {
         window.messages = data.messages || [];
         window.partnerName = data.partnerName || '梦角';
         window.myName = data.myName || '我';
         window.isDark = data.isDark || false;
         window.lastMsgId = data.lastMsgId || 0;
 
-        // 如果是从后备恢复的，异步写回 IndexedDB 修复存储
+        // 如果是从后备恢复的，异步写回修复存储
         if (fromBackup) {
             setTimeout(() => {
                 saveMessages().catch(() => {});
             }, 1000);
         }
-        return true;
+        return true; // 表示有数据
     }
 
-    // 4. 只有真正没有任何数据（初次使用）时才返回 false
+    // 4. 返回 false，表示没有有效数据，让 app.js 去初始化空数组
     return false;
 }
 
@@ -71,6 +73,12 @@ async function saveMessages() {
     } catch (e) {
         console.warn('保存消息失败:', e);
     }
+    // 同步写入 localStorage 备用
+    try {
+        _backupCriticalData();
+    } catch (e) {
+        console.warn('备用备份失败:', e);
+    }
 }
 window.saveMessages = saveMessages;
 
@@ -86,6 +94,7 @@ function scrollToBottom() {
 
 function renderMessages() {
     const chatArea = DOM.chatArea;
+    if (!chatArea) return;
     const myAv = window.avatarManager ? window.avatarManager.getMyAvatar() : null;
     const partnerAv = window.avatarManager ? window.avatarManager.getPartnerAvatar() : null;
 
@@ -170,6 +179,7 @@ window.renderMessages = renderMessages;
 // 增量追加（用于新消息，避免重绘整个列表）
 function appendMessageDOM(msg) {
     const chatArea = DOM.chatArea;
+    if (!chatArea) return;
     const myAv = window.avatarManager ? window.avatarManager.getMyAvatar() : null;
     const partnerAv = window.avatarManager ? window.avatarManager.getPartnerAvatar() : null;
 
@@ -291,7 +301,7 @@ window.sendMessage = async function(text, image) {
 
 // 更新已读回执
 function updateReadReceipt(msgId) {
-    const row = DOM.chatArea.querySelector(`.msg-row[data-msg-id="${msgId}"]`);
+    const row = DOM.chatArea ? DOM.chatArea.querySelector(`.msg-row[data-msg-id="${msgId}"]`) : null;
     if (row) {
         const statusEl = row.querySelector('.msg-meta .read-status');
         if (statusEl) {
@@ -364,7 +374,7 @@ function triggerReply(fromActive) {
     }
 
     window.isTyping = true;
-    DOM.contactStatus.textContent = '对方正在输入…';
+    if (DOM.contactStatus) DOM.contactStatus.textContent = '对方正在输入…';
 
     let delaySec = 2;
     if (window.frequencyManager) {
@@ -375,7 +385,7 @@ function triggerReply(fromActive) {
 
     window.typingTimer = setTimeout(async () => {
         window.isTyping = false;
-        DOM.contactStatus.textContent = '在线';
+        if (DOM.contactStatus) DOM.contactStatus.textContent = '在线';
 
         let replyText = null;
         let replyImage = null;
@@ -463,7 +473,7 @@ function markAllMyMessagesAsRead() {
         }
     });
     if (changed) {
-        const rows = DOM.chatArea.querySelectorAll('.msg-row.sent');
+        const rows = DOM.chatArea ? DOM.chatArea.querySelectorAll('.msg-row.sent') : [];
         rows.forEach(row => {
             const msgId = row.dataset.msgId;
             if (msgId) {
@@ -485,7 +495,7 @@ function markAllMyMessagesAsRead() {
 window.toggleTheme = function() {
     window.isDark = !window.isDark;
     document.documentElement.setAttribute('data-theme', window.isDark ? 'dark' : '');
-    DOM.themeToggle.innerHTML = window.isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+    if (DOM.themeToggle) DOM.themeToggle.innerHTML = window.isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
     saveMessages();
 };
 
@@ -512,6 +522,7 @@ function sendNotification() {
 
 // ---------- 7. 更新底部留白 ----------
 function updateChatPadding() {
+    if (!DOM.inputBar || !DOM.chatArea) return;
     const inputBarHeight = DOM.inputBar.offsetHeight;
     let quoteBarHeight = 0;
     const quoteBar = DOM.quoteBar;
@@ -528,7 +539,7 @@ function updateChatPadding() {
 }
 window.updateChatPadding = updateChatPadding;
 
-// ---------- 8. 后备备份与恢复（保留原代码） ----------
+// ---------- 8. 后备备份与恢复 ----------
 const _BACKUP_PREFIX = 'BACKUP_V1_';
 function _backupCriticalData() {
     if (window._skipBackup) return;
@@ -565,18 +576,3 @@ function _backupCriticalData() {
         console.warn('localStorage 备份写入失败:', e);
     }
 }
-function _tryRecoverFromBackup() {
-    try {
-        const raw = localStorage.getItem(_BACKUP_PREFIX + 'critical');
-        if (!raw) return null;
-        return JSON.parse(raw);
-    } catch (e) {
-        return null;
-    }
-}
-// 在保存时自动备份
-const originalSaveMessages = saveMessages;
-saveMessages = async function() {
-    await originalSaveMessages();
-    _backupCriticalData();
-};

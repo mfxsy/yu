@@ -12,32 +12,40 @@
     let chatArea = null;
     let msgInput = null;
 
-    // ★ 使用全局安全存储与防御性键生成
+    // ★ 使用全局安全存储与防御性键生成，并增加 localStorage 备用
     async function loadSettings() {
+        let data = null;
         try {
             const key = getStorageKey('quoteSettings');
-            const data = await safeGetItem(key);
-            if (data && typeof data.enabled === 'boolean') {
-                isQuoteEnabled = data.enabled;
-            } else {
-                isQuoteEnabled = false;
-                await saveSettings();
-            }
-            console.log('[引用] 加载成功:', isQuoteEnabled);
-        } catch (e) {
-            console.warn('引用设置加载失败，使用默认值:', e);
-            isQuoteEnabled = false;
+            data = await safeGetItem(key);
+        } catch (e) {}
+
+        if (!data || typeof data.enabled !== 'boolean') {
+            try {
+                const raw = localStorage.getItem('quoteSettings_fallback');
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (typeof parsed.enabled === 'boolean') {
+                        data = parsed;
+                        console.warn('[quote] 从 localStorage 恢复设置');
+                    }
+                }
+            } catch (e) {}
         }
+
+        isQuoteEnabled = data?.enabled ?? false;
+        await saveSettings();
+        console.log('[引用] 加载成功:', isQuoteEnabled);
     }
 
     async function saveSettings() {
         try {
             const key = getStorageKey('quoteSettings');
             await safeSetItem(key, { enabled: isQuoteEnabled });
-            console.log('[引用] 保存成功:', isQuoteEnabled);
-        } catch (e) {
-            console.warn('保存引用设置失败:', e);
-        }
+        } catch (e) { console.warn('保存引用设置失败:', e); }
+        try {
+            localStorage.setItem('quoteSettings_fallback', JSON.stringify({ enabled: isQuoteEnabled }));
+        } catch (e) {}
     }
 
     async function setEnabled(val) {
@@ -55,6 +63,7 @@
         chatArea = container;
         msgInput = inputElement;
 
+        if (!container) return;
         container.addEventListener('touchstart', onTouchStart, { passive: true });
         container.addEventListener('touchend', onTouchEnd, { passive: true });
         container.addEventListener('touchmove', onTouchMove, { passive: true });
@@ -152,18 +161,20 @@
             quoteBar.id = 'quoteBar';
             // 追加到输入栏内部
             const inputBar = document.getElementById('inputBar');
-            inputBar.appendChild(quoteBar); 
+            if (inputBar) inputBar.appendChild(quoteBar); 
         }
         const sender = quotedMsg.sender === 'me' ? '我' : '对方';
         const content = quotedMsg.text || (quotedMsg.image ? '[图片]' : '');
-        quoteBar.innerHTML = `
-            <span>${sender}：${content.substring(0, 50)}${content.length > 50 ? '…' : ''}</span>
-            <button id="clearQuoteBtn" style="background:none;border:none;color:var(--wechat-text-secondary);cursor:pointer;font-size:14px;"><i class="fas fa-times"></i></button>
-        `;
-        quoteBar.style.display = 'flex';
-        document.getElementById('clearQuoteBtn').addEventListener('click', function() {
-            clearQuote();
-        });
+        if (quoteBar) {
+            quoteBar.innerHTML = `
+                <span>${sender}：${content.substring(0, 50)}${content.length > 50 ? '…' : ''}</span>
+                <button id="clearQuoteBtn" style="background:none;border:none;color:var(--wechat-text-secondary);cursor:pointer;font-size:14px;"><i class="fas fa-times"></i></button>
+            `;
+            quoteBar.style.display = 'flex';
+            document.getElementById('clearQuoteBtn').addEventListener('click', function() {
+                clearQuote();
+            });
+        }
         if (msgInput) msgInput.focus();
 
         // 更新聊天区域底部间距
@@ -198,5 +209,5 @@
         loadSettings,
     };
 
-    console.log('✅ quoteManager 已加载，等待主程序调用 .loadSettings()');
+    console.log('✅ quoteManager 已加载，包含备用恢复机制');
 })();
