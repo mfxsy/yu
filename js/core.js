@@ -292,7 +292,7 @@ window.sendMessage = async function(text, image) {
         msg.replyTo = quoted.id;
         msg.replyToSender = quoted.sender;
         msg.replyToText = quoted.text || '';
-        msg.replyToImage = quoted.image || null; // ★ 添加图片引用
+        msg.replyToImage = quoted.image || null;
         if (window.quoteManager) window.quoteManager.clearQuote();
     }
 
@@ -356,7 +356,7 @@ window.addMessage = function(text, sender, type) {
     }
 };
 
-// ---------- 4. 自动回复逻辑 ----------
+// ---------- 4. 自动回复逻辑（★ 核心修改部分） ----------
 function triggerReply(fromActive) {
     if (window.isTyping) return;
 
@@ -409,6 +409,17 @@ function triggerReply(fromActive) {
         let replyText = null;
         let replyImage = null;
 
+        // ★ 辅助函数：随机获取最近 10 条我方消息（含文字或图片，或图文混合）
+        function getRandomRecentMyMsg() {
+            // 反向遍历，取最新 10 条我方发送的消息（只要包含文字或图片的都算）
+            const recentMyMsgs = window.messages.slice().reverse()
+                .filter(m => m.sender === 'me' && (m.text || m.image)) // ★ 放宽条件，允许纯图片
+                .slice(0, 10);
+            if (recentMyMsgs.length === 0) return null;
+            return recentMyMsgs[Math.floor(Math.random() * recentMyMsgs.length)];
+        }
+
+        // ---- 生成主回复 ----
         if (window.frequencyManager && textPool.length > 0) {
             const mergeResult = window.frequencyManager.mergeReplies(cards, textEmojis);
             if (mergeResult) {
@@ -441,14 +452,14 @@ function triggerReply(fromActive) {
             type: 'normal',
         };
 
-        // ★ 对方自动回复时，也支持引用（含图片）
+        // ★ 主回复：随机引用最近 10 条中的任意一条我方消息（含图片）
         if (window.quoteManager && window.quoteManager.getEnabled() && Math.random() < 0.3) {
-            const lastMyMsg = window.messages.slice().reverse().find(m => m.sender === 'me');
-            if (lastMyMsg) {
-                reply.replyTo = lastMyMsg.id;
-                reply.replyToSender = lastMyMsg.sender;
-                reply.replyToText = lastMyMsg.text || '';
-                reply.replyToImage = lastMyMsg.image || null; // ★ 携带图片
+            const quotedMsg = getRandomRecentMyMsg();
+            if (quotedMsg) {
+                reply.replyTo = quotedMsg.id;
+                reply.replyToSender = quotedMsg.sender;
+                reply.replyToText = quotedMsg.text || '';
+                reply.replyToImage = quotedMsg.image || null;
             }
         }
 
@@ -458,28 +469,71 @@ function triggerReply(fromActive) {
         await saveMessages();
         sendNotification();
 
-        // 标记所有我方未读消息为已读
+        // 标记已读
         markAllMyMessagesAsRead();
 
-        if (Math.random() < 0.2 && textPool.length > 1) {
-            const extraText = textPool[Math.floor(Math.random() * textPool.length)];
-            if (extraText) {
-                const extraMsg = {
-                    id: ++window.lastMsgId,
-                    sender: 'partner',
-                    text: extraText,
-                    image: null,
-                    time: new Date(),
-                    read: true,
-                    type: 'normal',
-                };
-                window.messages.push(extraMsg);
-                if (window.messages.length === 1) renderMessages();
-                else appendMessageDOM(extraMsg);
-                await saveMessages();
-                sendNotification();
+        // ★ 新逻辑：最多追加 5 条消息，每条独立 20% 概率判定（支持合并）
+        let extraCount = 0;
+        const MAX_EXTRA = 5;
+        while (extraCount < MAX_EXTRA && Math.random() < 0.2 && (textPool.length > 0 || partnerImages.length > 0)) {
+            let extraText = null;
+            let extraImage = null;
+
+            // 尝试合并多条内容（一条气泡包含多条字卡）
+            if (window.frequencyManager && textPool.length > 0) {
+                const mergeResult = window.frequencyManager.mergeReplies(cards, textEmojis);
+                if (mergeResult) {
+                    extraText = mergeResult.text;
+                }
             }
+
+            // 如果没触发合并，随机选一条文本或图片
+            if (extraText === null && extraImage === null) {
+                const mixedPool = [];
+                textPool.forEach(t => mixedPool.push({ type: 'text', data: t }));
+                partnerImages.forEach(src => mixedPool.push({ type: 'image', data: src }));
+
+                if (mixedPool.length === 0) break;
+
+                const chosen = mixedPool[Math.floor(Math.random() * mixedPool.length)];
+                if (chosen.type === 'text') {
+                    extraText = chosen.data;
+                } else {
+                    extraImage = chosen.data;
+                }
+            }
+
+            // 构造追加消息
+            const extraMsg = {
+                id: ++window.lastMsgId,
+                sender: 'partner',
+                text: extraText || '',
+                image: extraImage || null,
+                time: new Date(),
+                read: true,
+                type: 'normal',
+            };
+
+            // ★ 追加消息也随机引用最近 10 条中的任意一条我方消息（独立判定）
+            if (window.quoteManager && window.quoteManager.getEnabled() && Math.random() < 0.3) {
+                const quotedMsg = getRandomRecentMyMsg();
+                if (quotedMsg) {
+                    extraMsg.replyTo = quotedMsg.id;
+                    extraMsg.replyToSender = quotedMsg.sender;
+                    extraMsg.replyToText = quotedMsg.text || '';
+                    extraMsg.replyToImage = quotedMsg.image || null;
+                }
+            }
+
+            window.messages.push(extraMsg);
+            if (window.messages.length === 1) renderMessages();
+            else appendMessageDOM(extraMsg);
+            await saveMessages();
+            sendNotification();
+            extraCount++;
         }
+        // ★ 追加结束
+
     }, delayMs);
 }
 window.triggerReply = triggerReply;
