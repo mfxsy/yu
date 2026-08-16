@@ -22,7 +22,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         const hasData = await loadMessages();
         if (!hasData) {
             window.messages = [];
-            // ★ 注意：此处已删除 saveMessages()，防止覆盖旧数据
         }
 
         // 4. 刷新各管理器
@@ -44,6 +43,14 @@ document.addEventListener('DOMContentLoaded', async function() {
             document.documentElement.setAttribute('data-theme', 'dark');
             if (DOM.themeToggle) DOM.themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
         }
+
+        // =========================================================
+        // ★★★ 重点：在此处加入懒加载状态初始化配置 ★★★
+        // =========================================================
+        window.loadedBatchCount = 1;
+        window._currentRenderedCount = 0;
+        window._hasLoadedAll = false;
+        // =========================================================
 
         // 6. 更新界面
         if (DOM.contactName) DOM.contactName.textContent = window.partnerName;

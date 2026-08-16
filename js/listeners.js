@@ -4,15 +4,38 @@ function setupEventListeners() {
     const DOM = window.DOM;
     if (!DOM) return;
 
-    // --- 发送按钮 ---
+    // --- 发送按钮（单击发送，双击 300ms 内回到底部） ---
     if (DOM.sendBtn) {
+        let sendClickTimer = null;
+        let sendClickCount = 0;
+
         DOM.sendBtn.addEventListener('click', function() {
-            const text = DOM.msgInput ? DOM.msgInput.value : '';
-            if (text.trim()) {
-                window.sendMessage(text);
-                if (DOM.msgInput) {
-                    DOM.msgInput.value = '';
-                    DOM.msgInput.style.height = 'auto';
+            sendClickCount++;
+
+            if (sendClickCount === 1) {
+                // 第一次点击：设置 300ms 定时器，准备发送消息
+                sendClickTimer = setTimeout(() => {
+                    const text = DOM.msgInput ? DOM.msgInput.value : '';
+                    if (text.trim()) {
+                        window.sendMessage(text);
+                        if (DOM.msgInput) {
+                            DOM.msgInput.value = '';
+                            DOM.msgInput.style.height = 'auto';
+                        }
+                    }
+                    sendClickCount = 0;
+                }, 300);
+            } else if (sendClickCount === 2) {
+                // 第二次点击（300ms 内）：取消发送，直接回到最新消息
+                clearTimeout(sendClickTimer);
+                sendClickCount = 0;
+                
+                if (typeof window.scrollToBottom === 'function') {
+                    window.scrollToBottom();
+                    // 可选提示，如不需要可删除
+                    if (typeof window.showToast === 'function') {
+                        window.showToast('已返回最新', 'info');
+                    }
                 }
             }
         });
@@ -23,7 +46,7 @@ function setupEventListeners() {
         DOM.msgInput.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                if (DOM.sendBtn) DOM.sendBtn.click();
+                if (DOM.sendBtn) DOM.sendBtn.click(); // 触发按钮点击事件
             }
         });
         DOM.msgInput.addEventListener('input', function() {
@@ -163,7 +186,7 @@ function setupEventListeners() {
     }
 
     // =========================================================================
-    // ★★★ 核心修复：改用 click 事件自定义判断双击（解决移动端/触控板双击不触发问题） ★★★
+    // ★★★ 聊天区域双击引用（兼容原有逻辑） ★★★
     // =========================================================================
     if (DOM.chatArea) {
         // 初始化双击模式（兼容旧方法）
@@ -171,7 +194,7 @@ function setupEventListeners() {
             window.quoteManager.initDoubleClickQuote(DOM.chatArea);
         }
 
-        let clickTimer = null;
+        let chatClickTimer = null;
         let lastClickTime = 0;
         const DOUBLE_CLICK_DELAY = 300; // 两次点击的间隔小于 300ms 视为双击
 
@@ -187,8 +210,8 @@ function setupEventListeners() {
 
             if (timeSinceLastClick < DOUBLE_CLICK_DELAY) {
                 // 检测到双击动作！
-                clearTimeout(clickTimer);
-                clickTimer = null;
+                clearTimeout(chatClickTimer);
+                chatClickTimer = null;
                 lastClickTime = 0; // 重置状态
 
                 const row = bubble.closest('.msg-row');
@@ -206,11 +229,11 @@ function setupEventListeners() {
             } else {
                 // 这是间隔超过 300ms 的第一次点击
                 lastClickTime = now;
-                clearTimeout(clickTimer);
+                clearTimeout(chatClickTimer);
                 // 设置定时器，如果在 300ms 内没有第二次点击，则重置状态
-                clickTimer = setTimeout(() => {
+                chatClickTimer = setTimeout(() => {
                     lastClickTime = 0;
-                    clickTimer = null;
+                    chatClickTimer = null;
                 }, DOUBLE_CLICK_DELAY);
             }
         });
@@ -306,7 +329,7 @@ function setupEventListeners() {
         }
     });
 
-    // --- 单击查看大图（保持不变） ---
+    // --- 单击查看大图 ---
     window._viewImage = function(src) {
         const overlay = document.createElement('div');
         overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;cursor:pointer;animation:fadeIn 0.2s ease;';
@@ -340,8 +363,7 @@ function openNicknamePanel() {
     if (DOM.nicknamePanel) DOM.nicknamePanel.classList.add('open');
 }
 
-// ---------- 设置加载与保存（添加 localStorage 备用） ----------
-
+// ---------- 设置加载与保存 ----------
 async function loadTimestampSetting() {
     let data = null;
     try {
