@@ -147,9 +147,10 @@ function renderMessages() {
                 const yesterday = getDateKey(new Date(now.getTime() - 86400000));
                 if (dateKey === today) return '今天';
                 if (dateKey === yesterday) return '昨天';
-                const d = msg.time;
-                return d.getFullYear() + '年' + String(d.getMonth() + 1) + '月' + String(d.getDate()) + '日';
-            })();
+                // 👇 替换成下面这三行（直接拆解 dateKey 即可）
+    const parts = dateKey.split('-');
+    return parts[0] + '年' + parts[1] + '月' + parts[2] + '日';
+})();
             html += `<div class="msg-timestamp">${label}</div>`;
             lastDateKey = dateKey;
         }
@@ -258,9 +259,10 @@ async function loadOlderMessages() {
             const yesterday = getDateKey(new Date(now.getTime() - 86400000));
             if (dateKey === today) return '今天';
             if (dateKey === yesterday) return '昨天';
-            const d = msg.time;
-            return d.getFullYear() + '年' + String(d.getMonth() + 1) + '月' + String(d.getDate()) + '日';
-        })();
+            // 👇 替换成下面这三行（直接拆解 dateKey 即可）
+    const parts = dateKey.split('-');
+    return parts[0] + '年' + parts[1] + '月' + parts[2] + '日';
+})();
 
         if (dateKey !== lastDateKey) {
             if (!(messagesToPrepend.indexOf(msg) === 0 && label === existingDate)) {
@@ -370,9 +372,10 @@ function appendMessageDOM(msg) {
             const yesterday = getDateKey(new Date(now.getTime() - 86400000));
             if (dateKey === today) return '今天';
             if (dateKey === yesterday) return '昨天';
-            const d = msg.time;
-            return d.getFullYear() + '年' + String(d.getMonth() + 1) + '月' + String(d.getDate()) + '日';
-        })();
+            // 👇 替换成下面这三行（直接拆解 dateKey 即可）
+    const parts = dateKey.split('-');
+    return parts[0] + '年' + parts[1] + '月' + parts[2] + '日';
+})();
         const ts = document.createElement('div');
         ts.className = 'msg-timestamp';
         ts.textContent = label;
