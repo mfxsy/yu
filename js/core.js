@@ -534,7 +534,7 @@ function triggerReply(fromActive) {
     if (window.isTyping) return;
 
     if (!fromActive && window.noReplyEnabled) {
-        if (Math.random() < 0.65) return;
+        if (Math.random() < 0.50) return;
     }
 
     const cards = window.cardManager ? window.cardManager.getCards() : [];
